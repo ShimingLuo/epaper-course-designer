@@ -1,5 +1,4 @@
 # Build artifacts / screenshots (not needed to run the single-file HTML apps)
-fonts/
 output/
 
 # Local tooling / OS
