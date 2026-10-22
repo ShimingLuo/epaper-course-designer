@@ -12,6 +12,11 @@
 
 > 访问站点根目录会自动跳转到 **v2** 设计器。
 
+## 在线预览（GitHub Pages）
+- 🟢 **主入口（v2，最新）**：<https://shimingluo.github.io/epaper-course-designer/> （根目录自动跳转到 v2）
+- **v2 直链**：<https://shimingluo.github.io/epaper-course-designer/epaper-course-designer.v2.html>
+- **v1 直链**：<https://shimingluo.github.io/epaper-course-designer/epaper-course-designer.v1-backup.html>
+
 ## 特性
 - 画布渲染 + 三色像素量化管线（无灰阶、无抖动），与 EPD-nRF5 固件逐像素对齐。
 - 文泉驿 WQY 点阵字（GB2312 全量），本地嵌入，无需联网字体。
@@ -29,6 +34,3 @@
 
 ## 本地运行
 直接用浏览器打开对应的 `.html` 文件即可，无需构建、无需服务器。
-
-## 在线预览（GitHub Pages）
-https://shimingluo.github.io/epaper-course-designer/
