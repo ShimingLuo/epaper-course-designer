@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>墨水屏课程表设计器 · 4.2″ 400×300</title>
+<style>
+  :root{
+    --bg:#efeeeb;
+    --panel:#fbfbf9;
+    --ink:#1a1b19;
+    --ink-2:#4c4d49;
+    --ink-3:#8c8d86;
+    --line:#e6e4de;
+    --line-2:#f1efea;
+    --red:#c8102e;
+    --blue:#2f6fed;
+    --shadow:0 1px 2px rgba(26,27,25,.05), 0 22px 48px -28px rgba(26,27,25,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;overflow:hidden;color:var(--ink);background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    font-size:13px;-webkit-font-smoothing:antialiased;
+  }
+  button,input,select,textarea{font:inherit;color:inherit}
+  button{cursor:pointer}
+  .app{display:flex;flex-direction:column;height:100vh}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{
+    height:54px;flex:0 0 auto;display:flex;align-items:center;gap:8px;
+    padding:0 16px;background:#fff;border-bottom:1px solid var(--line);z-index:30;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .mark{
+    width:28px;height:28px;border-radius:6px;background:var(--ink);
+    display:grid;place-items:center;flex:0 0 auto;
+  }
+  .mark i{display:block;width:13px;height:9px;border:1.4px solid #fff;border-radius:1px;position:relative}
+  .mark i::after{content:"";position:absolute;right:-2px;bottom:-2px;width:5px;height:5px;background:var(--red);border-radius:1px}
+  .brand h1{margin:0;font-size:13px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+  .brand p{margin:0;font-size:10.5px;color:var(--ink-3);letter-spacing:.02em;white-space:nowrap}
+  .chip{
+    font-size:11px;color:#6d6e68;background:#f4f3ef;border-radius:999px;padding:3px 10px;
+    max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:6px;
+  }
+  .chip b{color:var(--ink);font-weight:600}
+  .spacer{flex:1}
+  .vsep{width:1px;height:20px;background:var(--line);margin:0 5px}
+
+  .btn{
+    height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:#fff;
+    font-size:12.5px;font-weight:500;color:#2b2c29;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    white-space:nowrap;transition:background .12s,border-color .12s,transform .06s;
+  }
+  .btn:hover{background:#f7f6f2;border-color:#dcdad3}
+  .btn:active{transform:translateY(.5px)}
+  .btn.quiet{border-color:transparent;background:transparent;color:var(--ink-2)}
+  .btn.quiet:hover{background:#f4f3ef;border-color:transparent;color:var(--ink)}
+  .btn svg{flex:0 0 auto;margin-top:-1px}
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  .btn.primary:hover{background:#000}
+  .btn.sm{height:27px;padding:0 10px;font-size:12px;border-radius:6px}
+  .icon-btn{
+    width:30px;height:30px;border-radius:7px;border:0;background:transparent;
+    display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2);font-size:14px;
+  }
+  .icon-btn:hover{background:#f4f3ef;color:var(--ink)}
+  .icon-btn:disabled{opacity:.3;cursor:default;background:transparent}
+
+  /* ---------- 工作区 ---------- */
+  .workspace{flex:1;display:grid;grid-template-columns:262px minmax(0,1fr) 266px;min-height:0}
+  .panel{background:var(--panel);overflow-y:auto;padding:2px 15px 44px}
+  .panel::-webkit-scrollbar{width:8px}
+  .panel::-webkit-scrollbar-thumb{background:#dcdad3;border-radius:4px;border:2px solid var(--panel)}
+  .panel.left{border-right:1px solid var(--line)}
+  .panel.right{border-left:1px solid var(--line)}
+
+  .card{padding:13px 0}
+  .card + .card{border-top:1px solid var(--line-2)}
+  .card-h{
+    font-size:10.5px;font-weight:600;letter-spacing:.09em;color:var(--ink-3);
+    margin:0 0 9px;display:block;
+  }
+
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;min-width:0}
+  .field > span{font-size:10.5px;color:var(--ink-3);letter-spacing:.02em}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .input,select,textarea{
+    width:100%;height:29px;border:1px solid var(--line);border-radius:6px;background:#fff;
+    padding:0 8px;font-size:12px;outline:none;transition:border-color .12s,box-shadow .12s;
+  }
+  .input:hover,select:hover,textarea:hover{border-color:#d9d7d0}
+  .input:focus,select:focus,textarea:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(26,27,25,.07)}
+  select{
+    appearance:none;padding-right:20px;
+    background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%23908f88' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 7px center;
+  }
+  textarea{height:auto;padding:6px 8px;resize:vertical;line-height:1.5;font-size:11.5px}
+  .check{display:flex;align-items:center;gap:7px;font-size:12px;color:#3a3b37;margin:0 0 8px;cursor:pointer;user-select:none;line-height:1.3}
+  .check input{accent-color:var(--ink);width:13px;height:13px;margin:0;flex:0 0 auto}
+  input[type="range"]{width:100%;height:18px;accent-color:var(--ink);margin:0}
+  .hint{margin:6px 0 0;font-size:10.5px;line-height:1.6;color:var(--ink-3)}
+  .hint code{background:#f1f0eb;border-radius:3px;padding:1px 4px;font-size:10px;color:var(--ink-2)}
+  .empty{margin:0;font-size:11px;line-height:1.6;color:var(--ink-3)}
+
+  .seg{display:flex;gap:2px;background:#f2f1ec;border:1px solid #eae8e2;border-radius:7px;padding:2px;margin-bottom:9px}
+  .seg button{
+    flex:1;height:24px;border:0;background:transparent;border-radius:5px;font-size:11.5px;color:var(--ink-2);
+    display:flex;align-items:center;justify-content:center;gap:5px;
+  }
+  .seg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.12)}
+  .dot.b{background:#000}.dot.r{background:var(--red)}.dot.w{background:#fff}
+
+  .btn-row{display:flex;gap:6px}
+  .btn-row.wrap{flex-wrap:wrap}
+  .btn-row .btn{flex:1;padding:0 6px}
+
+  .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .tpl{
+    border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px;
+    display:flex;flex-direction:column;gap:4px;text-align:left;transition:.12s;
+  }
+  .tpl:hover{border-color:#cfcdc6;transform:translateY(-1px)}
+  .tpl.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .tpl svg{display:block;width:100%;height:30px;border-radius:2px;background:#fff}
+  .tpl b{font-size:11px;font-weight:600;display:block}
+  .tpl em{font-style:normal;font-size:9.5px;color:var(--ink-3);display:block;line-height:1.2}
+
+  /* ---------- 舞台 ---------- */
+  .stage{
+    position:relative;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;padding:44px 24px 22px;
+    background:radial-gradient(120% 100% at 50% 0%, #f9f8f5 0%, #efeeea 55%, #e8e7e2 100%);
+  }
+  .stage-tools{
+    position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:2px;
+    background:rgba(255,255,255,.86);border:1px solid var(--line);border-radius:8px;padding:3px;
+    backdrop-filter:blur(8px);z-index:5;
+  }
+  .stage-tools button{
+    height:24px;min-width:24px;padding:0 6px;border:0;background:transparent;border-radius:5px;
+    font-size:11.5px;color:var(--ink-2);display:grid;place-items:center;
+  }
+  .stage-tools button:hover{background:#f2f1ec;color:var(--ink)}
+  .stage-tools span{min-width:40px;text-align:center;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .paper-wrap{padding:9px;background:#fff;border:1px solid #e3e1da;border-radius:3px;box-shadow:var(--shadow)}
+  .canvas-box{position:relative;background:#fff;line-height:0;outline:1px solid #ecebe6}
+  #cv{display:block;image-rendering:pixelated;image-rendering:crisp-edges;cursor:crosshair}
+  .stage-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .stage-meta b{color:var(--ink-2);font-weight:600}
+  .sep-dot{width:2px;height:2px;border-radius:50%;background:#c3c2bb}
+  .stage-tip{margin:0;font-size:10.5px;color:#a9a8a1;text-align:center;line-height:1.6}
+
+  /* 单元格编辑浮层 */
+  .cell-editor{
+    position:absolute;z-index:20;background:#fff;border:1px solid #d8d6cf;border-radius:7px;
+    box-shadow:0 12px 32px -12px rgba(26,27,25,.4);padding:6px;display:flex;flex-direction:column;gap:5px;
+  }
+  .cell-editor[hidden]{display:none}
+  .ce-head{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink-3)}
+  .ce-head .grow{flex:1}
+  .ce-colors{display:flex;gap:4px}
+  .ce-colors button{width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.18);padding:0}
+  .ce-colors button.on{box-shadow:0 0 0 2px #fff,0 0 0 3px var(--ink)}
+  .ce-del{border:0;background:transparent;color:var(--ink-3);font-size:10.5px;padding:2px 4px;border-radius:4px}
+  .ce-del:hover{background:#f3f2ed;color:var(--ink)}
+  .cell-editor textarea{border:1px solid var(--line);border-radius:5px;font-size:12px;min-height:44px;resize:none;padding:4px 6px;line-height:1.4}
+
+  /* 素材 / 属性 / 图层 */
+  .palette{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;margin-top:8px}
+  .pal-item{
+    border:0;background:transparent;border-radius:6px;padding:6px 0 5px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;color:#5b5c56;transition:.1s;cursor:grab;
+  }
+  .pal-item:hover{background:#f1f0eb;color:var(--ink)}
+  .pal-item:active{cursor:grabbing}
+  .pal-item span{font-size:9.5px;color:var(--ink-3);line-height:1}
+  .pal-item svg{pointer-events:none}
+
+  .props .prop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;font-size:11.5px;font-weight:600;color:var(--ink)}
+  .props .prop-head .mini{border:0;background:#f4f3ef;color:var(--ink-2);border-radius:5px;font-size:10.5px;padding:3px 7px}
+  .props .prop-head .mini:hover{background:#eae8e2;color:var(--ink)}
+  .props .field:last-child{margin-bottom:0}
+
+  .layers{display:flex;flex-direction:column;gap:2px}
+  .layer{display:flex;align-items:center;gap:6px;padding:4px 5px;border-radius:5px;font-size:11.5px;color:var(--ink-2);cursor:pointer}
+  .layer:hover{background:#f3f2ed}
+  .layer.active{background:#eeece6;color:var(--ink);font-weight:600}
+  .layer .li-ico{display:flex;width:15px;justify-content:center;color:inherit;opacity:.8}
+  .layer .li-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .layer .mini{
+    border:0;background:transparent;color:var(--ink-3);width:18px;height:18px;border-radius:4px;
+    font-size:10.5px;display:flex;align-items:center;justify-content:center;padding:0;
+  }
+  .layer .mini:hover{background:#e5e3dc;color:var(--ink)}
+
+  /* ---------- 数据编辑弹层 ---------- */
+  .modal{position:fixed;inset:0;background:rgba(26,27,25,.38);display:flex;align-items:center;justify-content:center;padding:24px;z-index:60}
+  .modal[hidden]{display:none}
+  .modal-card{
+    background:#fff;border-radius:12px;width:min(1000px,100%);max-height:86vh;display:flex;flex-direction:column;
+    box-shadow:0 40px 100px -40px rgba(0,0,0,.6);overflow:hidden;
+  }
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--line-2);display:flex;align-items:flex-start;gap:16px}
+  .modal-head h2{margin:0;font-size:14px;font-weight:600}
+  .modal-head p{margin:4px 0 0;font-size:11px;color:var(--ink-3);line-height:1.5}
+  .modal-head p code{background:#f2f1ec;border-radius:3px;padding:1px 4px}
+  .modal-head .grow{flex:1}
+  .modal-actions{display:flex;gap:8px;flex:0 0 auto}
+  .modal-body{overflow:auto;padding:14px 20px 18px}
+  .modal-foot{padding:10px 20px;border-top:1px solid var(--line-2);display:flex;align-items:center;gap:14px;font-size:10.5px;color:var(--ink-3)}
+  .dt{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;table-layout:fixed}
+  .dt th,.dt td{border-right:1px solid #eceae4;border-bottom:1px solid #eceae4;padding:0;position:relative}
+  .dt thead th{background:#f7f6f2;position:sticky;top:0;z-index:3}
+  .dt thead th.corner{width:58px;font-size:10.5px;color:var(--ink-3);font-weight:500;left:0;z-index:4}
+  .dt tbody th{background:#faf9f6;position:sticky;left:0;z-index:2;width:58px}
+  .dt td:first-child,.dt th:first-child{border-left:1px solid #eceae4}
+  .dt thead tr:first-child th{border-top:1px solid #eceae4}
+  .dt input{width:100%;height:30px;border:0;background:transparent;padding:0 8px;font-size:11.5px;text-align:center;outline:none}
+  .dt input:focus{background:#fffdf3;box-shadow:inset 0 0 0 1.5px var(--ink)}
+  .dt td.dc input{padding-right:18px}
+  .dt tr.sec td{background:#fff1f1}
+  .dt tr.sec td{background:#fffafa}
+  .dt tr.sec input{font-size:10.5px;color:var(--red);font-weight:600;letter-spacing:.1em}
+  .dt-size{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-3)}
+  .dt-size input{width:50px;height:26px;text-align:center;border:1px solid var(--line);border-radius:5px;font-size:11.5px;padding:0 4px}
+  .cchip{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:2px;border:1px solid rgba(0,0,0,.2);background:#000;padding:0}
+  .cchip.red{background:var(--red)}
+  .cchip:hover{box-shadow:0 0 0 2px rgba(26,27,25,.12)}
+
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,8px);
+    background:rgba(26,27,25,.92);color:#fff;font-size:11.5px;padding:8px 14px;border-radius:7px;
+    opacity:0;pointer-events:none;transition:.2s;z-index:99;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark"><i></i></div>
+      <div>
+        <h1>墨水屏课程表</h1>
+        <p>4.2″ · 400 × 300 · 1:1</p>
+      </div>
+    </div>
+    <span class="chip" id="docChip">课程表</span>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="undoBtn" title="撤销 ⌘Z"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="icon-btn" id="redoBtn" title="重做 ⇧⌘Z"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    <span class="vsep"></span>
+    <button class="btn" id="dataBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M9.5 9.5V20M15 9.5V20"/></svg>编辑数据</button>
+    <button class="btn quiet" id="importBtn">导入</button>
+    <button class="btn quiet" id="saveBtn">保存</button>
+    <button class="btn primary" id="exportBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5L16.5 10"/><path d="M4.5 19.5h15"/></svg>导出 PNG</button>
+  </header>
+
+  <main class="workspace">
+    <!-- LEFT -->
+    <aside class="panel left">
+      <div class="card">
+        <div class="card-h">显示规格</div>
+        <div class="seg" id="modeSeg">
+          <button data-mode="bw"><span class="dot b"></span>黑白</button>
+          <button data-mode="bwr" class="on"><span class="dot b"></span><span class="dot r"></span>黑白红</button>
+        </div>
+        <label class="field"><span>尺寸 / 分辨率</span>
+          <select id="specSel">
+            <option value="400x300">4.2″ · 400 × 300</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="quantChk" checked> 导出时量化为三色像素</label>
+        <p class="hint">画布按 1:1 像素显示，导出即为 400 × 300 的 PNG。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-h">版式</div>
+        <label class="check"><input type="checkbox" id="titleChk"> 标题栏</label>
+        <label class="field"><span>标题文字</span><input class="input" id="titleInput" placeholder="课程表"></label>
+        <div class="row2">
+          <label class="field"><span>标题底色</span>
+            <select id="titleStyleSel">
+              <option value="plain">白底黑字</option>
+              <option value="black">黑底白字</option>
+              <option value="red">红底白字</option>
+            </select>
+          </label>
+          <div class="field"><span>标题分隔线</span>
+            <label class="check" style="height:29px;margin:0"><input type="checkbox" id="ruleChk"> 显示红线</label>
+          </div>
+        </div>
+        <div class="row2">
+          <label class="field"><span>行（节次）</span><input type="number" id="rowsInput" min="1" max="14" value="6"></label>
+          <label class="field"><span>列（天）</span><input type="number" id="colsInput" min="1" max="7" value="5"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="headerChk"> 星期表头</label>
+        <label class="check"><input type="checkbox" id="timeChk"> 左侧节次栏</label>
+        <label class="check"><input type="checkbox" id="timesChk"> 节次栏显示时间</label>
+        <label class="check"><input type="checkbox" id="gridChk"> 显示网格线</label>
+        <div class="row2">
+          <label class="field"><span>线宽</span><select id="lineSel"><option value="1">1 px</option><option value="2">2 px</option></select></label>
+          <label class="field"><span>边距</span><input type="number" id="padInput" min="0" max="18" value="6"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="snapChk" checked> 拖动时吸附网格</label>
+      </div>
+
+      <div class="card">
+        <div class="card-h">上午 / 下午</div>
+        <label class="check"><input type="checkbox" id="secChk"> 显示分段色条</label>
+        <div class="row2">
+          <label class="field"><span>上午标题</span><input class="input" id="secAm" value="上午"></label>
+          <label class="field"><span>下午标题</span><input class="input" id="secPm" value="下午"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>下午起始节</span><input type="number" id="secSplit" min="2" max="14" value="4"></label>
+          <label class="field"><span>色条样式</span>
+            <select id="secStyle">
+              <option value="red">红底白字</option>
+              <option value="black">黑底白字</option>
+              <option value="plain">白底红字</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="textureChk"> 节次栏点阵纹理</label>
+      </div>
+
+      <div class="card">
+        <div class="card-h">星期 / 节次</div>
+        <label class="field"><span>星期（每行一个）</span><textarea id="daysTa" rows="5"></textarea></label>
+        <label class="field"><span>节次时间（每行一个，可留空）</span><textarea id="timesTa" rows="6"></textarea></label>
+      </div>
+
+      <div class="card">
+        <div class="card-h">模版</div>
+        <div class="tpl-grid" id="tplGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">课程数据</div>
+        <button class="btn" id="dataBtn2" style="width:100%">编辑全部数据</button>
+        <p class="hint">一次编辑星期、节次时间、每节课与分段标题，支持从 Excel 直接粘贴。</p>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn sm" id="demoBtn">示例课程</button>
+          <button class="btn sm" id="clearBtn">清空内容</button>
+        </div>
+      </div>
+        </aside>
+
+    <!-- STAGE -->
+    <section class="stage">
+      <div class="stage-tools">
+        <button id="zoomOut" title="缩小">−</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn" title="放大">+</button>
+        <span class="vsep" style="margin:0 2px"></span>
+        <button id="fitBtn" title="实际像素 1:1">1:1</button>
+      </div>
+      <div class="paper-wrap">
+        <div class="canvas-box" id="canvasBox">
+          <canvas id="cv" width="400" height="300"></canvas>
+          <div class="cell-editor" id="cellEditor" hidden>
+            <div class="ce-head">
+              <span id="ceLabel">单元格</span>
+              <span class="grow"></span>
+              <span class="ce-colors">
+                <button data-c="black" title="黑色"></button>
+                <button data-c="red" title="红色"></button>
+              </span>
+              <button class="ce-del" id="ceDel">清除</button>
+            </div>
+            <textarea id="ceText" placeholder="语文|A101" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="stage-meta">
+        <b>400 × 300 px</b><span class="sep-dot"></span><span>1:1</span>
+        <span class="sep-dot"></span><span id="metaMode">黑白红</span>
+        <span class="sep-dot"></span><span id="metaGrid">5 天 × 6 节</span>
+      </div>
+      <p class="stage-tip">拖动图标移动 · 双击单元格改课程 · 顶栏「编辑数据」可批量填写 · ⌘Z 撤销</p>
+    </section></section>
+
+    <!-- RIGHT -->
+    <aside class="panel right">
+      <div class="card">
+        <div class="card-h">添加元素</div>
+        <div class="btn-row wrap">
+          <button class="btn sm" data-add="text">文本框</button>
+          <button class="btn sm" data-add="badge">标签块</button>
+          <button class="btn sm" data-add="line">分隔线</button>
+          <button class="btn sm" data-add="rect">方框</button>
+        </div>
+        <div class="palette" id="palette"></div>
+        <p class="hint">把图标拖到画布，或单击放到画布中央。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-h">属性</div>
+        <div class="props" id="props"><p class="empty">选中画布上的元素后可编辑属性。</p></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">图层</div>
+        <div class="layers" id="layers"><p class="empty">还没有元素。</p></div>
+      </div>
+    </aside>
+  </main>
+</div>
+<div class="modal" id="dataModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="grow">
+        <h2>编辑课程数据</h2>
+        <p>直接修改表格，或从 Excel / 表格复制后点单元格粘贴（Tab 分隔）· 用 <code>|</code> 分隔主副标题</p>
+        <input class="input" id="dataTitleInput" placeholder="课程表标题" style="max-width:260px;margin-top:9px">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="dataCancel">取消</button>
+        <button class="btn primary" id="dataApply">应用</button>
+      </div>
+    </div>
+    <div class="modal-body"><div id="dataTable"></div></div>
+    <div class="modal-foot">
+      <label class="dt-size">节次 <input id="dataRows" type="number" min="1" max="14" value="6"></label>
+      <label class="dt-size">天 <input id="dataCols" type="number" min="1" max="7" value="5"></label>
+      <span>点右侧色块切换 黑 / 红</span>
+      <span style="flex:1"></span>
+      <span id="dataCount"></span>
+    </div>
+  </div>
+</div>
+<input type="file" id="fileInput" accept="application/json" hidden>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ==================================================================
+   1. 常量与素材
+   ================================================================== */
+const FONTS = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,sans-serif';
+const BLACK = '#000000';
+const RED = '#c8102e';
+const STORE_KEY = 'epaper-course-designer-v1';
+
+const ICONS = {
+  book:    {label:'课本', p:['M4 19.5A2.5 2.5 0 0 1 6.5 17H20','M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z']},
+  pen:     {label:'笔记', p:['M12 20h9','M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z']},
+  flask:   {label:'实验', p:['M9 3h6','M10 3v6.2L4.8 18.4A1.8 1.8 0 0 0 6.3 21h11.4a1.8 1.8 0 0 0 1.5-2.6L14 9.2V3']},
+  calc:    {label:'数学', p:['M5 3h14v18H5z','M8.5 7.5h7','M8.5 12h.01','M12 12h.01','M15.5 12h.01','M8.5 15.5h.01','M12 15.5h.01','M15.5 15.5h.01','M8.5 19h7']},
+  globe:   {label:'地理', p:['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z','M3.5 9h17','M3.5 15h17','M12 3a15 15 0 0 1 0 18','M12 3a15 15 0 0 0 0 18']},
+  music:   {label:'音乐', p:['M9 18V6l11-2v12','M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z','M17 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z']},
+  ball:    {label:'体育', p:['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z','M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z','M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z']},
+  brush:   {label:'美术', p:['M14 4.5l5.5 5.5-8 8H6.5v-5l7.5-8.5z','M9.5 14.5 3 21']},
+  code:    {label:'编程', p:['m16 18 5-6-5-6','m8 6-5 6 5 6']},
+  laptop:  {label:'机房', p:['M4 5h16v11H4z','M2 20h20']},
+  bell:    {label:'提醒', p:['M18 8.5A6 6 0 0 0 6 8.5c0 6.5-2.5 8.5-2.5 8.5h17S18 15 18 8.5z','M13.7 20.5a2 2 0 0 1-3.4 0']},
+  coffee:  {label:'休息', p:['M4 8h13v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8z','M17 9h1.5a2.5 2.5 0 0 1 0 5H17','M4 3.5h13']},
+  bus:     {label:'通勤', p:['M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10H4V6z','M4 16h16v2H4z','M7 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z','M17 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z']},
+  star:    {label:'重点', p:['M12 3.5l2.6 5.6 6 .8-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.9l6-.8L12 3.5z']},
+  clock:   {label:'时间', p:['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z','M12 7v5l3.5 2']},
+  calendar:{label:'日程', p:['M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1z','M4 10h16','M8 3v4','M16 3v4']},
+  home:    {label:'作业', p:['M3 10.5 12 3.5l9 7','M5.5 9.5V20.5h13V9.5']},
+  moon:    {label:'晚修', p:['M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z']},
+  users:   {label:'班级', p:['M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2','M9 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z','M22 20v-2a4 4 0 0 0-3-3.9','M16 3.1a4 4 0 0 1 0 7.8']},
+  pin:     {label:'地点', p:['M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z','M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z']},
+  flag:    {label:'目标', p:['M5 21V4','M5 4h11l-1.5 4L16 12H5']},
+  sun:     {label:'早读', p:['M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z','M12 1.5V4','M12 20v2.5','M3.5 12H1','M23 12h-2.5','M5 5l1.8 1.8','M17.2 17.2 19 19','M19 5l-1.8 1.8','M6.8 17.2 5 19']},
+  check:   {label:'完成', p:['M4 12.5 9 18 20 6']},
+  arrow:   {label:'箭头', p:['M4 12h15','M13 6l6 6-6 6']},
+  table:   {label:'表格', p:['M4 4h16v16H4z','M4 9.3h16','M4 14.6h16','M9.3 4v16','M14.6 4v16']}
+};
+
+const TYPE_LABEL = {text:'文本框', icon:'图标', badge:'标签块', line:'分隔线', rect:'方框'};
+const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日'];
+
+const DEMO_SCHEDULE = [
+  ['语文|A101','数学|A102','语文|A101','数学|A102','语文|A101'],
+  ['数学|A102','语文|A101','美术|C302','体育|操场','语文|A101'],
+  ['体育|操场','体育|操场','书法|B201','数学|A102','数学|A102'],
+  ['语文|A101','美术|C302','体育|操场','科学|实验室','英语|A103'],
+  ['劳动|校内','道德与法治|A101','班会|A101','音乐|C301','音乐|C301'],
+  ['英语绘本|A103','','','','数学|A102']
+];
+
+/* ==================================================================
+   2. 状态
+   ================================================================== */
+function demoCells(){
+  const out = {};
+  DEMO_SCHEDULE.forEach(function(row,r){
+    row.forEach(function(t,c){
+      if(!t) return;
+      const red = /^(班会|音乐|社团)/.test(t);
+      out[r+'_'+c] = {t:t, c: red ? 'red' : 'black'};
+    });
+  });
+  return out;
+}
+
+function defaultState(){
+  return {
+    v: 1,
+    width: 400,
+    height: 300,
+    colorMode: 'bwr',      // bw | bwr
+    quantize: true,
+    snap: true,
+    selTpl: 'standard',
+    selId: null,
+    grid: {
+      pad: 6,
+      rows: 6,
+      cols: 5,
+      showGrid: true,
+      showHeader: true,
+      headerH: 22,
+      showTime: true,
+      timeW: 30,
+      showTimes: false,
+      texture: 'none',
+      sections: {on:true, morning:'上午', afternoon:'下午', split:3, style:'red'},
+      sectionH: 15,
+      lineW: 1,
+      title: {show:true, text:'课程表', h:32, gap:3, style:'plain', rule:true},
+      days: ['周一','周二','周三','周四','周五'],
+      times: ['08:00','08:55','10:00','10:55','14:00','14:55']
+    },
+    cells: demoCells(),
+    elements: []
+  };
+}
+
+/* ---------- 模板 ---------- */
+const TEMPLATES = {
+  standard: {name:'上午下午', desc:'5 天 × 6 节 · 红条分段', texture:'none', colorMode:'bwr',
+    sections:{on:true, morning:'上午', afternoon:'下午', split:3, style:'red'},
+    grid:{
+      pad:6, rows:6, cols:5, showGrid:true, showHeader:true, headerH:22, showTime:true, timeW:30, showTimes:false, lineW:1,
+      title:{show:true,text:'课程表',h:30,gap:3,style:'plain',rule:true},
+      days:['周一','周二','周三','周四','周五'],
+      times:['08:00','08:55','10:00','10:55','14:00','14:55']
+    }},
+  plainbw: {name:'纯黑白', desc:'5 天 × 6 节 · 无红', texture:'none', colorMode:'bw',
+    sections:{on:true, morning:'上午', afternoon:'下午', split:3, style:'plain'},
+    grid:{
+      pad:6, rows:6, cols:5, showGrid:true, showHeader:true, headerH:22, showTime:true, timeW:30, showTimes:false, lineW:1,
+      title:{show:true,text:'课程表',h:30,gap:3,style:'plain',rule:false},
+      days:['周一','周二','周三','周四','周五'],
+      times:['08:00','08:55','10:00','10:55','14:00','14:55']
+    }},
+  compact: {name:'紧凑八节', desc:'5 天 × 8 节', texture:'none', colorMode:'bwr',
+    sections:{on:true, morning:'上午', afternoon:'下午', split:4, style:'plain'},
+    grid:{
+      pad:5, rows:8, cols:5, showGrid:true, showHeader:true, headerH:18, showTime:true, timeW:26, showTimes:false, lineW:1,
+      title:{show:true,text:'课程表',h:26,gap:2,style:'plain',rule:true},
+      days:['周一','周二','周三','周四','周五'],
+      times:['08:00','08:45','09:40','10:20','11:05','14:00','14:45','15:30']
+    }},
+  week7: {name:'整周七天', desc:'7 天 × 6 节', texture:'none', colorMode:'bwr',
+    sections:{on:true, morning:'上午', afternoon:'下午', split:3, style:'red'},
+    grid:{
+      pad:5, rows:6, cols:7, showGrid:true, showHeader:true, headerH:20, showTime:false, timeW:0, showTimes:false, lineW:1,
+      title:{show:true,text:'课程表',h:26,gap:2,style:'plain',rule:true},
+      days:['周一','周二','周三','周四','周五','周六','周日'],
+      times:['08:00','08:55','10:00','10:55','14:00','14:55']
+    }},
+  blocks: {name:'大字标题', desc:'黑底标题 · 5 × 5', texture:'none', colorMode:'bwr',
+    sections:{on:false, morning:'上午', afternoon:'下午', split:3, style:'black'},
+    grid:{
+      pad:8, rows:5, cols:5, showGrid:true, showHeader:true, headerH:24, showTime:true, timeW:34, showTimes:false, lineW:2,
+      title:{show:true,text:'课程表',h:36,gap:5,style:'black',rule:false},
+      days:['周一','周二','周三','周四','周五'],
+      times:['08:00','09:00','10:10','14:00','15:00']
+    }},
+  blank: {name:'空白画布', desc:'自由排版', texture:'none', colorMode:'bwr',
+    sections:{on:false, morning:'上午', afternoon:'下午', split:3, style:'red'},
+    grid:{
+      pad:6, rows:6, cols:5, showGrid:false, showHeader:false, headerH:0, showTime:false, timeW:0, showTimes:false, lineW:1,
+      title:{show:false,text:'课程表',h:30,gap:3,style:'plain',rule:false},
+      days:['周一','周二','周三','周四','周五'],
+      times:['08:00','08:55','10:00','10:55','14:00','14:55']
+    }}
+
+};
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+function normalize(s){
+  const d = defaultState();
+  if(!s || typeof s !== 'object') return d;
+  const out = Object.assign({}, d, s);
+  out.grid = Object.assign({}, d.grid, s.grid || {});
+  out.grid.title = Object.assign({}, d.grid.title, (s.grid && s.grid.title) || {});
+  out.grid.sections = Object.assign({}, d.grid.sections, (s.grid && s.grid.sections) || {});
+  out.cells = (s.cells && typeof s.cells === 'object') ? s.cells : {};
+  out.elements = Array.isArray(s.elements) ? s.elements : [];
+  out.width = 400; out.height = 300;
+  out.grid.days = Array.isArray(out.grid.days) ? out.grid.days : d.grid.days.slice();
+  out.grid.times = Array.isArray(out.grid.times) ? out.grid.times : d.grid.times.slice();
+  return out;
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return null;
+    return normalize(JSON.parse(raw));
+  }catch(e){ return null; }
+}
+
+let state = loadState() || defaultState();
+let selId = null;
+let zoom = 1;
+let exporting = false;
+let propsFor = null;
+
+/* ==================================================================
+   3. DOM
+   ================================================================== */
+const $ = function(sel){ return document.querySelector(sel); };
+function esc(s){
+  return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+const cv = $('#cv');
+const ctx = cv.getContext('2d');
+const canvasBox = $('#canvasBox');
+const propsEl = $('#props');
+const layersEl = $('#layers');
+const paletteEl = $('#palette');
+const tplGrid = $('#tplGrid');
+const cellEditor = $('#cellEditor');
+const ceText = $('#ceText');
+const toastEl = $('#toast');
+
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ toastEl.classList.remove('on'); }, 1600);
+}
+
+/* ==================================================================
+   4. 布局与绘制
+   ================================================================== */
+function sectionBands(g, rows){
+  const out = [];
+  if(!g.sections || !g.sections.on || rows < 2) return out;
+  const sp = clamp(Math.round(g.sections.split || 1), 1, rows - 1);
+  out.push({at:0, text:g.sections.morning || '上午'});
+  out.push({at:sp, text:g.sections.afternoon || '下午'});
+  return out;
+}
+
+function layout(){
+  const g = state.grid, W = state.width, H = state.height;
+  const pad = g.pad;
+  let y = pad, title = null;
+  if(g.title.show){
+    title = {x:pad, y:y, w:W - pad*2, h:g.title.h};
+    y += g.title.h + (g.title.gap || 0);
+  }
+  const timeW = g.showTime ? g.timeW : 0;
+  const headerH = g.showHeader ? g.headerH : 0;
+  const gridX = pad + timeW;
+  const gridY = y + headerH;
+  const gridW = Math.max(12, W - pad*2 - timeW);
+  const gridH = Math.max(12, H - pad - gridY);
+  const cols = Math.max(1, g.cols), rows = Math.max(1, g.rows);
+
+  const bands = sectionBands(g, rows);
+  const bandH = bands.length ? (g.sectionH || 15) : 0;
+  const ch = Math.max(6, (gridH - bands.length * bandH) / rows);
+  const bandObjs = bands.map(function(b, i){
+    return {at:b.at, text:b.text, y:gridY + i*bandH + b.at*ch, h:bandH};
+  });
+  const bandAt = {};
+  for(let i=0;i<bands.length;i++) bandAt[bands[i].at] = true;
+
+  function rowTop(r){
+    let n = 0;
+    for(let i=0;i<bands.length;i++){ if(bands[i].at <= r) n++; }
+    return gridY + n*bandH + r*ch;
+  }
+
+  return {
+    pad:pad, title:title, timeW:timeW, headerH:headerH,
+    gridX:gridX, gridY:gridY, gridW:gridW, gridH:gridH,
+    cw: gridW/cols, ch: ch, rows:rows, cols:cols,
+    bands: bandObjs, bandH: bandH, bandAt: bandAt, rowTop: rowTop,
+    header:{x:gridX, y:gridY-headerH, w:gridW, h:headerH}
+  };
+}
+
+function fitFont(text, maxW, start, weight, min){
+  weight = weight || '700'; min = min || 6;
+  let s = Math.max(min, Math.round(start));
+  while(s > min){
+    ctx.font = weight + ' ' + s + 'px ' + FONTS;
+    if(ctx.measureText(text).width <= maxW) break;
+    s -= 1;
+  }
+  ctx.font = weight + ' ' + s + 'px ' + FONTS;
+  return s;
+}
+
+function drawTitle(L){
+  const t = state.grid.title;
+  if(!t.show || !L.title) return;
+  const r = L.title;
+  if(t.style === 'black' || t.style === 'red'){
+    ctx.fillStyle = (t.style === 'red' && state.colorMode === 'bwr') ? RED : BLACK;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
+  const size = fitFont(t.text || '', r.w - 10, Math.min(20, r.h * 0.58), '700', 9);
+  ctx.fillStyle = (t.style === 'black' || t.style === 'red') ? '#ffffff' : BLACK;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(t.text || '', r.x + r.w/2, r.y + r.h/2 + 1);
+  if(t.rule && state.colorMode === 'bwr'){
+    ctx.fillStyle = RED;
+    ctx.fillRect(r.x, r.y + r.h - 2, r.w, 2);
+  }
+}
+
+function drawHeader(L){
+  const g = state.grid;
+  if(!g.showHeader || !g.showGrid) return;
+  const h = L.header;
+  if(h.h <= 2) return;
+  ctx.fillStyle = BLACK;
+  ctx.fillRect(L.pad, h.y, (L.timeW || 0), h.h);   // 左上角
+  ctx.fillStyle = BLACK;
+  ctx.fillRect(h.x, h.y, h.w, h.h);                // 表头底
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for(let c=0;c<L.cols;c++){
+    const label = state.grid.days[c] || DAY_NAMES[c] || '';
+    const cx = h.x + L.cw*c + L.cw/2;
+    fitFont(label, L.cw - 5, Math.min(12, h.h * 0.52), '700', 6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, cx, h.y + h.h/2 + 1);
+  }
+}
+
+function drawTimeCol(L){
+  const g = state.grid;
+  if(!g.showTime || !g.showGrid) return;
+  if(L.timeW < 12) return;
+  const cx = L.pad + L.timeW/2;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = BLACK;
+  for(let r=0;r<L.rows;r++){
+    const top = L.rowTop(r);
+    const time = g.times[r] || '';
+    if(g.showTimes && time && L.ch >= 28){
+      ctx.fillStyle = (state.colorMode === 'bwr') ? RED : BLACK;
+      fitFont(String(r+1), L.timeW - 4, Math.min(11, L.ch*0.32), '700', 6);
+      ctx.fillText(String(r+1), cx, top + L.ch*0.34);
+      ctx.fillStyle = BLACK;
+      const tf = Math.max(7, Math.min(8, Math.round(L.ch*0.21)));
+      ctx.font = '600 ' + tf + 'px ' + FONTS;
+      if(ctx.measureText(time).width <= L.timeW - 2){
+        ctx.fillText(time, cx, top + L.ch*0.72);
+      }
+    }else{
+      ctx.fillStyle = (state.colorMode === 'bwr') ? RED : BLACK;
+      fitFont(String(r+1), L.timeW - 4, Math.min(13, L.ch*0.44), '700', 6);
+      ctx.fillText(String(r+1), cx, top + L.ch/2 + 0.5);
+    }
+  }
+}
+
+function cellColor(cell){
+  if(!cell) return BLACK;
+  if(cell.c === 'red' && state.colorMode === 'bwr') return RED;
+  return BLACK;
+}
+
+function drawCells(L){
+  if(!state.grid.showGrid) return;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for(let r=0;r<L.rows;r++){
+    for(let c=0;c<L.cols;c++){
+      const cell = state.cells[r+'_'+c];
+      if(!cell || !cell.t) continue;
+      const x = L.gridX + L.cw*c, y = L.rowTop(r);
+      const parts = String(cell.t).split('|');
+      const main = parts[0] || '';
+      const sub = parts[1] || '';
+      if(!main && !sub) continue;
+      const maxW = L.cw - 6;
+      let s1 = fitFont(main || sub, maxW, Math.min(15, Math.max(8, Math.round(L.ch*0.38))), '700', 6);
+      const s2 = sub ? Math.max(7, Math.round(s1 * 0.8)) : 0;
+      const blockH = s1*1.18 + (sub ? s2*1.22 : 0);
+      let ty = y + (L.ch - blockH)/2;
+      ctx.fillStyle = cellColor(cell);
+      if(main){
+        ctx.font = '700 ' + s1 + 'px ' + FONTS;
+        ctx.fillText(main, x + L.cw/2, ty, maxW);
+      }
+      if(sub){
+        ctx.font = '500 ' + s2 + 'px ' + FONTS;
+        ctx.fillText(sub, x + L.cw/2, ty + s1*1.18, maxW);
+      }
+    }
+  }
+}
+
+function drawLines(L){
+  const g = state.grid;
+  if(!g.showGrid) return;
+  const lw = g.lineW;
+  const off = lw >> 1;
+
+  /* 表格外框占据的像素范围：左右闭合、上下闭合，且与表头/色条填充区完全重合 */
+  const x0 = Math.round(L.pad);
+  const x1 = Math.round(L.gridX + L.gridW) - 1;
+  const y0 = Math.round(L.gridY);
+  const y1 = Math.round(L.rowTop(L.rows)) - 1;
+  if(x1 - x0 < 4 || y1 - y0 < 4) return;
+
+  ctx.fillStyle = BLACK;
+
+  /* ---- 横向分隔线：铺满整幅宽度，不外溢 ---- */
+  const hw = x1 - x0 + 1;
+  const yb0 = Math.round(L.rowTop(0));
+  if(yb0 > y0 + lw && yb0 < y1 - lw + 1) ctx.fillRect(x0, yb0 - off, hw, lw);
+  for(let r=1;r<L.rows;r++){
+    const y = clamp(Math.round(L.rowTop(r)), y0 + lw + off, y1 - lw + 1);
+    ctx.fillRect(x0, y - off, hw, lw);
+  }
+
+  /* ---- 竖向分隔线：按色条断开，底端与外框接合 ---- */
+  const xs = [];
+  for(let c=(g.showTime ? 0 : 1); c<L.cols; c++){
+    xs.push(clamp(Math.round(L.gridX + L.cw*c) - off, x0 + lw, x1 - lw - off + 1));
+  }
+  for(let k=0;k<xs.length;k++){
+    let r = 0;
+    while(r < L.rows){
+      let r2 = r;
+      while(r2 + 1 < L.rows && !L.bandAt[r2+1]) r2++;
+      const top = Math.max(y0 + lw, Math.round(L.rowTop(r)));
+      let bot = (r2 >= L.rows - 1) ? (y1 + 1) : Math.round(L.rowTop(r2) + L.ch);
+      bot = Math.min(bot, y1 + 1);
+      if(bot > top) ctx.fillRect(xs[k], top, lw, bot - top);
+      r = r2 + 1;
+    }
+  }
+
+  /* ---- 外框：四条边共用同一组像素边界，转角自然闭合 ---- */
+  ctx.fillRect(x0, y0, lw, y1 - y0 + 1);                       /* 左 */
+  ctx.fillRect(x1 - lw + 1, y0, lw, y1 - y0 + 1);              /* 右 */
+  ctx.fillRect(x0, y0, hw, lw);                                /* 上 */
+  ctx.fillRect(x0, y1 - lw + 1, hw, lw);                       /* 下 */
+}
+
+/* 上午 / 下午 色条 */
+function drawBands(L){
+  if(!L.bands || !L.bands.length) return;
+  const style = state.grid.sections.style || 'red';
+  const left = L.pad, right = L.gridX + L.gridW, w = right - left;
+  for(let i=0;i<L.bands.length;i++){
+    const b = L.bands[i];
+    const label = b.text || '';
+    if(style === 'plain'){
+      const col = state.colorMode === 'bwr' ? RED : BLACK;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(left, b.y, w, b.h);
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      const fs = Math.min(11, Math.round(b.h*0.76));
+      ctx.font = '700 ' + fs + 'px ' + FONTS;
+      ctx.fillStyle = col;
+      ctx.fillText(label, left + 2, b.y + b.h/2 + 0.5);
+      const tw = ctx.measureText(label).width;
+      const lx = left + 2 + tw + 5;
+      if(lx < right - 4){
+        ctx.fillRect(Math.round(lx), Math.round(b.y + b.h/2), right - Math.round(lx), 1);
+      }
+    }else{
+      const fill = (style === 'black' || state.colorMode === 'bw') ? BLACK : RED;
+      ctx.fillStyle = fill;
+      ctx.fillRect(left, b.y, w, b.h);
+      if(b.at === 0 && style === 'black' && state.grid.showHeader){
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(left, b.y, w, 1);
+      }
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 ' + Math.min(11, Math.round(b.h*0.76)) + 'px ' + FONTS;
+      try{ ctx.letterSpacing = '1px'; }catch(e){}
+      ctx.fillText(label, left + w/2, b.y + b.h/2 + 0.5, w - 8);
+      try{ ctx.letterSpacing = '0px'; }catch(e){}
+    }
+  }
+}
+
+/* 节次栏点阵纹理 */
+function drawTimeTexture(L){
+  const g = state.grid;
+  if(g.texture !== 'dots' || !g.showGrid || !g.showTime) return;
+  if(L.timeW < 16) return;
+  ctx.fillStyle = BLACK;
+  const x0 = L.pad + 2, x1 = L.gridX - 2, step = 4;
+  for(let r=0;r<L.rows;r++){
+    const y0 = L.rowTop(r) + 2, y1 = L.rowTop(r) + L.ch - 2;
+    for(let y=y0; y<y1; y+=step){
+      for(let x=x0; x<x1; x+=step){
+        ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+    }
+  }
+}
+
+/* ---------- 元素 ---------- */
+function iconDraw(key, x, y, size, color, ew){
+  const ic = ICONS[key];
+  if(!ic) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size/24, size/24);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(0.6, (ew || 2) * 24 / size);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for(let i=0;i<ic.p.length;i++){
+    try{ ctx.stroke(new Path2D(ic.p[i])); }catch(e){}
+  }
+  ctx.restore();
+}
+
+function elColor(el){
+  return (el.color === 'red' && state.colorMode === 'bwr') ? RED : BLACK;
+}
+
+function drawElement(el){
+  if(el.hidden) return;
+  const col = elColor(el);
+  ctx.save();
+  if(el.type === 'icon'){
+    const s = Math.min(el.w, el.h);
+    iconDraw(el.icon, el.x + (el.w - s)/2, el.y + (el.h - s)/2, s, col, el.stroke || 2);
+  }else if(el.type === 'text'){
+    const b = bounds(el);
+    ctx.fillStyle = col;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = el.align || 'left';
+    ctx.font = (el.weight || 600) + ' ' + (el.size || 14) + 'px ' + FONTS;
+    let tx = b.x;
+    if(el.align === 'center') tx = b.x + b.w/2;
+    if(el.align === 'right') tx = b.x + b.w;
+    ctx.fillText(el.text || '', tx, b.y);
+  }else if(el.type === 'badge'){
+    const b = bounds(el);
+    const filled = el.fill !== 'none';
+    if(filled){
+      ctx.fillStyle = (el.fill === 'red' && state.colorMode === 'bwr') ? RED : BLACK;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+    }else{
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+    }
+    ctx.fillStyle = filled ? '#ffffff' : col;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = (el.weight || 700) + ' ' + (el.size || 11) + 'px ' + FONTS;
+    ctx.fillText(el.text || '', b.x + b.w/2, b.y + b.h/2 + 0.5);
+  }else if(el.type === 'line'){
+    ctx.fillStyle = col;
+    ctx.fillRect(el.x, el.y, el.w, el.thickness || 1);
+  }else if(el.type === 'rect'){
+    ctx.strokeStyle = col;
+    ctx.lineWidth = el.thickness || 1;
+    ctx.strokeRect(el.x + 0.5, el.y + 0.5, Math.max(1, el.w - 1), Math.max(1, el.h - 1));
+  }
+  ctx.restore();
+}
+
+function drawElements(){
+  for(let i=0;i<state.elements.length;i++) drawElement(state.elements[i]);
+}
+
+function meMeasure(text, size, weight){
+  ctx.font = (weight || 600) + ' ' + size + 'px ' + FONTS;
+  return ctx.measureText(text || '').width;
+}
+
+function bounds(el, ox, oy){
+  const x = (ox === undefined) ? el.x : ox;
+  const y = (oy === undefined) ? el.y : oy;
+  if(el.type === 'text'){
+    const w = Math.max(4, meMeasure(el.text, el.size || 14, el.weight || 600));
+    const h = (el.size || 14) * 1.28;
+    let bx = x;
+    if(el.align === 'center') bx = x - w/2;
+    if(el.align === 'right') bx = x - w;
+    return {x:bx, y:y, w:w, h:h};
+  }
+  if(el.type === 'badge'){
+    const tw = meMeasure(el.text, el.size || 11, el.weight || 700);
+    const w = tw + 10, h = (el.size || 11) + 7;
+    return {x:x, y:y, w:w, h:h};
+  }
+  if(el.type === 'line'){
+    return {x:x, y:y - 3, w:el.w, h:Math.max(7, el.thickness || 1)};
+  }
+  return {x:x, y:y, w:el.w || 10, h:el.h || 10};
+}
+
+function drawSelection(){
+  const el = getSel();
+  if(!el) return;
+  const b = bounds(el);
+  ctx.save();
+  ctx.strokeStyle = '#2f7bf6';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  ctx.strokeRect(Math.round(b.x) - 0.5, Math.round(b.y) - 0.5, Math.round(b.w) + 1, Math.round(b.h) + 1);
+  ctx.setLineDash([]);
+  const pts = handlePoints(b);
+  for(let i=0;i<pts.length;i++){
+    const p = pts[i];
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(Math.round(p.x) - 3, Math.round(p.y) - 3, 6, 6);
+    ctx.strokeStyle = '#2f7bf6';
+    ctx.strokeRect(Math.round(p.x) - 3.5, Math.round(p.y) - 3.5, 7, 7);
+  }
+  ctx.restore();
+}
+
+function handlePoints(b){
+  return [
+    {x:b.x, y:b.y, k:'nw'},
+    {x:b.x + b.w, y:b.y, k:'ne'},
+    {x:b.x, y:b.y + b.h, k:'sw'},
+    {x:b.x + b.w, y:b.y + b.h, k:'se'}
+  ];
+}
+
+/* ---------- 主绘制 ---------- */
+function draw(){
+  const W = state.width, H = state.height;
+  if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,W,H);
+  ctx.imageSmoothingEnabled = false;
+
+  const L = layout();
+  drawTitle(L);
+  drawHeader(L);
+  drawTimeTexture(L);
+  drawTimeCol(L);
+  drawCells(L);
+  drawBands(L);
+  drawLines(L);
+  drawElements();
+  if(!exporting) drawSelection();
+  updateMeta(L);
+}
+
+function updateMeta(L){
+  L = L || layout();
+  $('#metaMode').textContent = state.colorMode === 'bwr' ? '黑白红' : '黑白';
+  $('#metaGrid').textContent = state.grid.cols + ' 天 × ' + state.grid.rows + ' 节';
+  $('#zoomLabel').textContent = Math.round(zoom*100) + '%';
+}
+
+/* ==================================================================
+   5. 元素操作
+   ================================================================== */
+function getSel(){
+  if(!selId) return null;
+  for(let i=0;i<state.elements.length;i++){
+    if(state.elements[i].id === selId) return state.elements[i];
+  }
+  return null;
+}
+
+function uid(){ return 'e' + Math.random().toString(36).slice(2, 8); }
+
+function addElement(el){
+  el.id = uid();
+  state.elements.push(el);
+  selId = el.id;
+  commit();
+  renderProps(true);
+  renderLayers();
+  draw();
+}
+
+function addIcon(key, cx, cy){
+  const size = 24;
+  addElement({
+    type:'icon', icon:key,
+    x: Math.round((cx === undefined ? state.width/2 : cx) - size/2),
+    y: Math.round((cy === undefined ? state.height/2 : cy) - size/2),
+    w:size, h:size, stroke:2, color:'black'
+  });
+  const el = getSel();
+  if(el && state.snap){
+    const s = snapMove(el, el.x, el.y);
+    if(s.x !== el.x || s.y !== el.y){ el.x = s.x; el.y = s.y; commit(); draw(); }
+  }
+}
+
+function addText(){
+  addElement({type:'text', text:'文字', x: Math.round(state.width/2) - 20, y: Math.round(state.height/2),
+    size:14, weight:600, align:'left', color:'black'});
+}
+
+function addBadge(){
+  addElement({type:'badge', text:'标签', x: Math.round(state.width/2) - 20, y: Math.round(state.height/2) - 9,
+    size:11, weight:700, fill:'black', color:'black'});
+}
+
+function addLine(){
+  addElement({type:'line', x:20, y: Math.round(state.height/2), w: state.width - 40, thickness:1, color:'black'});
+}
+
+function addRect(){
+  addElement({type:'rect', x:40, y:40, w:120, h:70, thickness:1, color:'black'});
+}
+
+function deleteSelected(){
+  if(!selId) return;
+  state.elements = state.elements.filter(function(e){ return e.id !== selId; });
+  selId = null;
+  commit();
+  renderProps(true);
+  renderLayers();
+  draw();
+}
+
+function moveLayer(dir){
+  const el = getSel();
+  if(!el) return;
+  const i = state.elements.indexOf(el);
+  const j = i + dir;
+  if(j < 0 || j >= state.elements.length) return;
+  state.elements.splice(i,1);
+  state.elements.splice(j,0,el);
+  commit();
+  renderLayers();
+}
+
+/* ==================================================================
+   6. 指针交互
+   ================================================================== */
+let drag = null;
+
+function canvasPoint(e){
+  const r = cv.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (state.width / r.width),
+    y: (e.clientY - r.top) * (state.height / r.height)
+  };
+}
+
+function hitTest(p){
+  for(let i=state.elements.length-1;i>=0;i--){
+    const el = state.elements[i];
+    if(el.hidden) continue;
+    const b = bounds(el);
+    const pad = 2;
+    if(p.x >= b.x-pad && p.x <= b.x+b.w+pad && p.y >= b.y-pad && p.y <= b.y+b.h+pad){
+      if(el.type === 'line'){
+        if(p.y >= b.y && p.y <= b.y + b.h) return el;
+        continue;
+      }
+      return el;
+    }
+  }
+  return null;
+}
+
+function handleHit(b, p){
+  const pts = handlePoints(b);
+  for(let i=0;i<pts.length;i++){
+    if(Math.abs(p.x - pts[i].x) <= 5 && Math.abs(p.y - pts[i].y) <= 5) return pts[i].k;
+  }
+  return null;
+}
+
+cv.addEventListener('pointerdown', function(e){
+  if(e.button !== 0) return;
+  closeCellEditor();
+  const p = canvasPoint(e);
+  const el = getSel();
+  if(el){
+    const b = bounds(el);
+    const h = handleHit(b, p);
+    if(h){
+      drag = {mode:'resize', handle:h, start:p, orig:{x:el.x, y:el.y, w:b.w, h:b.h, size:el.size || 12}};
+      cv.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+  const hit = hitTest(p);
+  if(hit){
+    if(selId !== hit.id) selectEl(hit.id);
+    drag = {mode:'move', start:p, orig:{x:hit.x, y:hit.y}};
+    cv.setPointerCapture(e.pointerId);
+  }else if(selId){
+    selectEl(null);
+  }
+});
+
+cv.addEventListener('pointermove', function(e){
+  if(!drag){
+    const p = canvasPoint(e);
+    let cursor = 'crosshair';
+    if(getSel()){
+      const b = bounds(getSel());
+      const h = handleHit(b, p);
+      if(h) cursor = (h === 'nw' || h === 'se') ? 'nwse-resize' : 'nesw-resize';
+      else if(hitTest(p)) cursor = 'move';
+    }else if(hitTest(p)) cursor = 'move';
+    cv.style.cursor = cursor;
+    return;
+  }
+  const el = getSel();
+  if(!el) return;
+  const p = canvasPoint(e);
+  const dx = p.x - drag.start.x;
+  const dy = p.y - drag.start.y;
+
+  if(drag.mode === 'move'){
+    const s = snapMove(el, drag.orig.x + dx, drag.orig.y + dy);
+    el.x = s.x; el.y = s.y;
+    }else{
+      const h = drag.handle;
+      const o = drag.orig;
+      if(el.type === 'text' || el.type === 'badge'){
+        const signX = h.indexOf('e') >= 0 ? 1 : -1;
+        const f = 1 + (dx * signX) / Math.max(28, o.w);
+        el.size = clamp(Math.round(o.size * f), 6, 48);
+        if(h.indexOf('w') >= 0) el.x = Math.round(o.x + dx);
+        if(h.indexOf('n') >= 0) el.y = Math.round(o.y + dy);
+      }else if(el.type === 'line'){
+        const nw = h.indexOf('w') >= 0 ? o.w - dx : o.w + dx;
+        el.w = Math.max(4, Math.round(nw));
+        if(h.indexOf('w') >= 0) el.x = Math.round(o.x + dx);
+      }else{
+        let nx = o.x, ny = o.y, nw = o.w, nh = o.h;
+        if(h.indexOf('e') >= 0) nw = o.w + dx;
+        if(h.indexOf('s') >= 0) nh = o.h + dy;
+        if(h.indexOf('w') >= 0){ nw = o.w - dx; nx = o.x + dx; }
+        if(h.indexOf('n') >= 0){ nh = o.h - dy; ny = o.y + dy; }
+        el.x = Math.round(nx);
+        el.y = Math.round(ny);
+        el.w = Math.max(6, Math.round(nw));
+        el.h = Math.max(6, Math.round(nh));
+      }
+    }
+  draw();
+});
+
+cv.addEventListener('pointerup', function(e){
+  if(!drag) return;
+  drag = null;
+  try{ cv.releasePointerCapture(e.pointerId); }catch(err){}
+  commit();
+});
+
+cv.addEventListener('dblclick', function(e){
+  const p = canvasPoint(e);
+  if(hitTest(p)) return;           // 命中了图标/文字等元素，不进入单元格编辑
+  const cell = cellAt(p);
+  if(cell) openCellEditor(cell.r, cell.c);
+});
+
+/* ---------- 吸附 ---------- */
+function snapTargets(){
+  const L = layout();
+  const xs = [L.pad, state.width - L.pad, state.width/2];
+  const ys = [L.pad, state.height - L.pad, state.height/2];
+  const cx = [], cy = [];
+  for(let i=0;i<=L.cols;i++) xs.push(L.gridX + L.cw*i);
+  for(let r=0;r<L.rows;r++){
+    ys.push(L.rowTop(r), L.rowTop(r) + L.ch);
+    for(let c=0;c<L.cols;c++){
+      cx.push(L.gridX + L.cw*c + L.cw/2);
+      cy.push(L.rowTop(r) + L.ch/2);
+    }
+  }
+  for(let i=0;i<L.bands.length;i++) ys.push(L.bands[i].y, L.bands[i].y + L.bands[i].h);
+  if(L.title){ ys.push(L.title.y, L.title.y + L.title.h); }
+  return {xs:xs, ys:ys, cx:cx, cy:cy};
+}
+
+function nearestDelta(edges, targets, limit){
+  let best = 0, bestAbs = limit + 0.001;
+  for(let i=0;i<edges.length;i++){
+    for(let j=0;j<targets.length;j++){
+      const d = targets[j] - edges[i];
+      if(Math.abs(d) < bestAbs){ bestAbs = Math.abs(d); best = d; }
+    }
+  }
+  return best;
+}
+
+function snapMove(el, x, y){
+  if(!state.snap) return {x:Math.round(x), y:Math.round(y)};
+  const b = bounds(el, x, y);
+  const t = snapTargets();
+  let dx = nearestDelta([b.x, b.x + b.w], t.xs, 4);
+  let dy = nearestDelta([b.y, b.y + b.h], t.ys, 4);
+  const dxc = nearestDelta([b.x + b.w/2], t.cx, 4);
+  const dyc = nearestDelta([b.y + b.h/2], t.cy, 4);
+  if(dxc && (Math.abs(dxc) < Math.abs(dx) || !dx)) dx = dxc;
+  if(dyc && (Math.abs(dyc) < Math.abs(dy) || !dy)) dy = dyc;
+  return {x:Math.round(x + dx), y:Math.round(y + dy)};
+}
+
+function clamp(v, a, b){ return Math.min(b, Math.max(a, v)); }
+
+/* ---------- 选择 ---------- */
+function selectEl(id){
+  selId = id;
+  if(state.elements.length && id === null) propsFor = null;
+  draw();
+  renderProps(false);
+  renderLayers();
+}
+
+/* ==================================================================
+   7. 单元格编辑
+   ================================================================== */
+let editingCell = null;
+
+function cellAt(p){
+  const L = layout();
+  if(!state.grid.showGrid) return null;
+  if(p.x < L.gridX || p.x > L.gridX + L.gridW) return null;
+  if(p.y < L.gridY || p.y > L.gridY + L.gridH) return null;
+  const c = Math.floor((p.x - L.gridX) / L.cw);
+  let r = -1;
+  for(let i=0;i<L.rows;i++){
+    const top = L.rowTop(i);
+    if(p.y >= top && p.y < top + L.ch){ r = i; break; }
+  }
+  if(r < 0 || c < 0 || r >= L.rows || c >= L.cols) return null;
+  return {r:r, c:c};
+}
+
+function openCellEditor(r, c){
+  const L = layout();
+  const key = r + '_' + c;
+  const cell = state.cells[key] || {t:'', c:'black'};
+  editingCell = {r:r, c:c};
+  const w = Math.max(150, Math.round(L.cw * zoom));
+  const h = Math.max(96, Math.round(L.ch * zoom));
+  cellEditor.hidden = false;
+  cellEditor.style.width = w + 'px';
+  cellEditor.style.left = Math.min(L.gridX + L.cw*c, state.width*zoom - w) + 'px';
+  cellEditor.style.top = Math.min(L.gridY + L.ch*r, state.height*zoom - h) + 'px';
+  $('#ceLabel').textContent = '第 ' + (r+1) + ' 节 · ' + (state.grid.days[c] || DAY_NAMES[c] || '');
+  ceText.value = cell.t || '';
+  syncCeColors(cell.c || 'black');
+  setTimeout(function(){ ceText.focus(); ceText.select(); }, 10);
+}
+
+function syncCeColors(mode){
+  const btns = cellEditor.querySelectorAll('.ce-colors button');
+  for(let i=0;i<btns.length;i++){
+    const on = btns[i].getAttribute('data-c') === mode;
+    btns[i].classList.toggle('on', on);
+    btns[i].style.background = btns[i].getAttribute('data-c') === 'red' ? RED : '#000';
+    btns[i].style.opacity = (btns[i].getAttribute('data-c') === 'red' && state.colorMode === 'bw') ? .35 : 1;
+  }
+}
+
+function commitCell(){
+  if(!editingCell) return;
+  const key = editingCell.r + '_' + editingCell.c;
+  const text = ceText.value.trim();
+  const prev = state.cells[key];
+  const color = prev ? prev.c : 'black';
+  if(text) state.cells[key] = {t:text, c:color};
+  else delete state.cells[key];
+  editingCell = null;
+  cellEditor.hidden = true;
+  commit();
+}
+
+function closeCellEditor(){
+  if(editingCell) commitCell();
+}
+
+ceText.addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); commitCell(); }
+  if(e.key === 'Escape'){ editingCell = null; cellEditor.hidden = true; draw(); }
+});
+
+ceText.addEventListener('blur', function(){
+  setTimeout(function(){
+    if(editingCell && document.activeElement !== ceText) commitCell();
+  }, 80);
+});
+
+cellEditor.addEventListener('mousedown', function(e){
+  if(e.target.closest('.ce-colors')) e.preventDefault();
+});
+
+cellEditor.addEventListener('click', function(e){
+  const dot = e.target.closest('.ce-colors button');
+  if(dot && editingCell){
+    const key = editingCell.r + '_' + editingCell.c;
+    const color = dot.getAttribute('data-c');
+    if(color === 'red' && state.colorMode === 'bw') return;
+    const cur = state.cells[key] || {t:''};
+    state.cells[key] = {t: cur.t || '', c: color};
+    syncCeColors(color);
+    draw();
+    return;
+  }
+  if(e.target.closest('#ceDel') && editingCell){
+    delete state.cells[editingCell.r + '_' + editingCell.c];
+    ceText.value = '';
+    draw();
+  }
+});
+
+/* ==================================================================
+   8. 右侧面板
+   ================================================================== */
+function iconSVG(key, size){
+  const ic = ICONS[key];
+  if(!ic) return '';
+  const paths = ic.p.map(function(d){ return '<path d="' + d + '"/>'; }).join('');
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+         'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+}
+
+function renderPalette(){
+  let html = '';
+  Object.keys(ICONS).forEach(function(k){
+    html += '<button class="pal-item" draggable="true" data-icon="' + k + '" title="' + ICONS[k].label + '">' +
+            iconSVG(k, 18) + '<span>' + ICONS[k].label + '</span></button>';
+  });
+  paletteEl.innerHTML = html;
+}
+
+paletteEl.addEventListener('dragstart', function(e){
+  const item = e.target.closest('.pal-item');
+  if(!item) return;
+  e.dataTransfer.setData('text/plain', 'icon:' + item.getAttribute('data-icon'));
+  e.dataTransfer.effectAllowed = 'copy';
+});
+
+paletteEl.addEventListener('click', function(e){
+  const item = e.target.closest('.pal-item');
+  if(item) addIcon(item.getAttribute('data-icon'));
+});
+
+/* 添加元素按钮 */
+document.querySelectorAll('[data-add]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const t = btn.getAttribute('data-add');
+    if(t === 'text') addText();
+    else if(t === 'badge') addBadge();
+    else if(t === 'line') addLine();
+    else if(t === 'rect') addRect();
+  });
+});
+
+document.addEventListener('dragover', function(e){ e.preventDefault(); });
+document.addEventListener('drop', function(e){ e.preventDefault(); });
+
+cv.addEventListener('dragover', function(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+
+cv.addEventListener('drop', function(e){
+  e.preventDefault();
+  const data = e.dataTransfer.getData('text/plain') || '';
+  if(data.indexOf('icon:') === 0){
+    const p = canvasPoint(e);
+    addIcon(data.slice(5), p.x, p.y);
+  }
+});
+
+/* ---------- 属性面板 ---------- */
+function renderProps(force){
+  if(!force && propsFor === selId) return;
+  propsFor = selId;
+  const el = getSel();
+  if(!el){
+    propsEl.innerHTML = '<p class="empty">选中画布上的元素后可编辑属性。<br>图标支持拖动、缩放与换色。</p>';
+    return;
+  }
+  const colorField =
+    '<label class="field"><span>颜色</span><select data-prop="color">' +
+      '<option value="black"' + (el.color !== 'red' ? ' selected' : '') + '>黑色</option>' +
+      '<option value="red"' + (el.color === 'red' ? ' selected' : '') + (state.colorMode === 'bw' ? ' disabled' : '') + '>红色</option>' +
+    '</select></label>';
+
+  let html = '<div class="prop-head"><span>' + TYPE_LABEL[el.type] + '</span>' +
+             '<span><button class="mini" data-act="front" title="上移一层">上移</button> ' +
+             '<button class="mini" data-act="delete">删除</button></span></div>';
+
+  if(el.type === 'text'){
+    html += '<label class="field"><span>文字</span><input class="input" data-prop="text" value="' + esc(el.text || '') + '"></label>' +
+      '<div class="row2">' +
+        '<label class="field"><span>字号</span><input class="input" type="number" data-prop="size" min="6" max="48" value="' + (el.size || 14) + '"></label>' +
+        '<label class="field"><span>粗细</span><select data-prop="weight">' +
+          '<option value="400"' + (Number(el.weight) === 400 ? ' selected' : '') + '>常规</option>' +
+          '<option value="600"' + (Number(el.weight) === 600 ? ' selected' : '') + '>中粗</option>' +
+          '<option value="700"' + (Number(el.weight) === 700 ? ' selected' : '') + '>加粗</option>' +
+        '</select></label>' +
+      '</div>' +
+      '<label class="field"><span>对齐</span><select data-prop="align">' +
+        '<option value="left"' + (el.align === 'left' ? ' selected' : '') + '>左对齐</option>' +
+        '<option value="center"' + (el.align === 'center' ? ' selected' : '') + '>居中</option>' +
+        '<option value="right"' + (el.align === 'right' ? ' selected' : '') + '>右对齐</option>' +
+      '</select></label>' + colorField;
+  }else if(el.type === 'icon'){
+    html += colorField +
+      '<div class="row2">' +
+        '<label class="field"><span>宽</span><input class="input" type="number" data-prop="w" min="6" max="300" value="' + Math.round(el.w) + '"></label>' +
+        '<label class="field"><span>高</span><input class="input" type="number" data-prop="h" min="6" max="300" value="' + Math.round(el.h) + '"></label>' +
+      '</div>' +
+      '<label class="field"><span>描边粗细</span><input type="range" data-prop="stroke" min="1" max="4" step="0.5" value="' + (el.stroke || 2) + '"></label>';
+  }else if(el.type === 'badge'){
+    html += '<label class="field"><span>文字</span><input class="input" data-prop="text" value="' + esc(el.text || '') + '"></label>' +
+      '<div class="row2">' +
+        '<label class="field"><span>字号</span><input class="input" type="number" data-prop="size" min="6" max="32" value="' + (el.size || 11) + '"></label>' +
+        '<label class="field"><span>填充</span><select data-prop="fill">' +
+          '<option value="black"' + (el.fill === 'black' ? ' selected' : '') + '>黑色</option>' +
+          '<option value="red"' + (el.fill === 'red' ? ' selected' : '') + (state.colorMode === 'bw' ? ' disabled' : '') + '>红色</option>' +
+          '<option value="none"' + (el.fill === 'none' ? ' selected' : '') + '>无（描边）</option>' +
+        '</select></label>' +
+      '</div>' + colorField;
+  }else if(el.type === 'line'){
+    html += colorField +
+      '<div class="row2">' +
+        '<label class="field"><span>长度</span><input class="input" type="number" data-prop="w" min="4" max="400" value="' + Math.round(el.w) + '"></label>' +
+        '<label class="field"><span>粗细</span><input class="input" type="number" data-prop="thickness" min="1" max="8" value="' + (el.thickness || 1) + '"></label>' +
+      '</div>';
+  }else if(el.type === 'rect'){
+    html += colorField +
+      '<div class="row2">' +
+        '<label class="field"><span>宽</span><input class="input" type="number" data-prop="w" min="4" max="400" value="' + Math.round(el.w) + '"></label>' +
+        '<label class="field"><span>高</span><input class="input" type="number" data-prop="h" min="4" max="300" value="' + Math.round(el.h) + '"></label>' +
+      '</div>' +
+      '<label class="field"><span>线宽</span><input class="input" type="number" data-prop="thickness" min="1" max="6" value="' + (el.thickness || 1) + '"></label>';
+  }
+
+  html += '<div class="row2" style="margin-top:8px">' +
+    '<label class="field"><span>X</span><input class="input" type="number" data-prop="x" value="' + Math.round(el.x) + '"></label>' +
+    '<label class="field"><span>Y</span><input class="input" type="number" data-prop="y" value="' + Math.round(el.y) + '"></label>' +
+  '</div>';
+
+  propsEl.innerHTML = html;
+}
+
+propsEl.addEventListener('input', function(e){
+  const f = e.target.closest('[data-prop]');
+  if(!f) return;
+  const el = getSel();
+  if(!el) return;
+  const prop = f.getAttribute('data-prop');
+  let v = f.value;
+  if(f.type === 'number' || f.type === 'range') v = Number(v);
+  if(f.type === 'number' && (v !== v || v === null)) return;
+  if(prop === 'size' && v < 4) v = 4;
+  if(prop === 'w' || prop === 'h') v = Math.max(4, Math.min(400, v));
+  el[prop] = v;
+  draw();
+  renderLayers();
+  scheduleCommit();
+});
+
+propsEl.addEventListener('click', function(e){
+  const act = e.target.getAttribute('data-act');
+  if(act === 'delete') deleteSelected();
+  if(act === 'front') moveLayer(1);
+});
+
+/* ---------- 图层 ---------- */
+function elLabel(el){
+  if(el.type === 'icon') return (ICONS[el.icon] ? ICONS[el.icon].label : '图标');
+  if(el.type === 'text' || el.type === 'badge') return el.text || TYPE_LABEL[el.type];
+  return TYPE_LABEL[el.type] || '元素';
+}
+
+function renderLayers(){
+  if(!state.elements.length){
+    layersEl.innerHTML = '<p class="empty">还没有元素。从上方图标库拖到画布试试。</p>';
+    return;
+  }
+  let html = '';
+  for(let i=state.elements.length-1;i>=0;i--){
+    const el = state.elements[i];
+    html += '<div class="layer' + (el.id === selId ? ' active' : '') + '" data-id="' + el.id + '">' +
+      '<span class="li-ico">' + (el.type === 'icon' ? iconSVG(el.icon, 14) : typeGlyph(el.type)) + '</span>' +
+      '<span class="li-name">' + esc(elLabel(el)) + '</span>' +
+      '<button class="mini" data-act="up" title="上移一层">↑</button>' +
+      '<button class="mini" data-act="del" title="删除">✕</button>' +
+    '</div>';
+  }
+  layersEl.innerHTML = html;
+}
+
+function typeGlyph(t){
+  if(t === 'text') return '<span style="font-size:11px;font-weight:700">T</span>';
+  if(t === 'badge') return '<span style="display:inline-block;width:10px;height:7px;background:#000;border-radius:1px"></span>';
+  if(t === 'line') return '<span style="display:inline-block;width:11px;height:1.5px;background:#000"></span>';
+  if(t === 'rect') return '<span style="display:inline-block;width:9px;height:8px;border:1.2px solid #000"></span>';
+  return '';
+}
+
+layersEl.addEventListener('click', function(e){
+  const row = e.target.closest('.layer');
+  if(!row) return;
+  const id = row.getAttribute('data-id');
+  const btn = e.target.closest('.mini');
+  if(btn){
+    const act = btn.getAttribute('data-act');
+    if(act === 'up'){
+      const el = state.elements.filter(function(x){ return x.id === id; })[0];
+      if(el){
+        const i = state.elements.indexOf(el);
+        if(i < state.elements.length-1){
+          state.elements.splice(i,1);
+          state.elements.splice(i+1,0,el);
+          commit();
+          renderLayers();
+        }
+      }
+      return;
+    }
+    if(act === 'del'){
+      state.elements = state.elements.filter(function(x){ return x.id !== id; });
+      if(selId === id) selId = null;
+      commit();
+      renderProps(true);
+      renderLayers();
+      return;
+    }
+  }
+  selectEl(id);
+});
+
+/* ==================================================================
+   9. 左侧设置
+   ================================================================== */
+function syncLeft(){
+  const g = state.grid;
+  $('#modeSeg').querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-mode') === state.colorMode);
+  });
+  $('#quantChk').checked = !!state.quantize;
+  $('#titleChk').checked = !!g.title.show;
+  $('#titleInput').value = g.title.text || '';
+  $('#titleStyleSel').value = g.title.style || 'plain';
+  $('#ruleChk').checked = !!g.title.rule;
+  $('#rowsInput').value = g.rows;
+  $('#colsInput').value = g.cols;
+  $('#headerChk').checked = !!g.showHeader;
+  $('#timeChk').checked = !!g.showTime;
+  $('#timesChk').checked = !!g.showTimes;
+  $('#gridChk').checked = !!g.showGrid;
+  $('#lineSel').value = String(g.lineW);
+  $('#padInput').value = g.pad;
+  $('#snapChk').checked = !!state.snap;
+  const sec = g.sections || {};
+  $('#secChk').checked = !!sec.on;
+  $('#secAm').value = sec.morning || '上午';
+  $('#secPm').value = sec.afternoon || '下午';
+  $('#secSplit').value = clamp(sec.split || 3, 1, Math.max(1, g.rows - 1));
+  $('#secSplit').max = Math.max(2, g.rows - 1);
+  $('#secStyle').value = sec.style || 'red';
+  $('#textureChk').checked = g.texture === 'dots';
+  $('#docChip').textContent = g.title.text || '课程表';
+  $('#daysTa').value = g.days.join('\n');
+  $('#timesTa').value = g.times.join('\n');
+  tplGrid.querySelectorAll('.tpl').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-tpl') === state.selTpl);
+  });
+}
+
+function renderTemplates(){
+  let html = '';
+  Object.keys(TEMPLATES).forEach(function(k){
+    const t = TEMPLATES[k];
+    html += '<button class="tpl" data-tpl="' + k + '">' + miniSVG(t.grid, t.sections) +
+            '<b>' + t.name + '</b><em>' + t.desc + '</em></button>';
+  });
+  tplGrid.innerHTML = html;
+}
+
+function miniSVG(g, sec){
+  const W = 100, H = 64;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">';
+  s += '<rect width="' + W + '" height="' + H + '" fill="#fff" stroke="#e2e5e9"/>';
+  if(!g.showGrid) return s + '</svg>';
+  let top = 4;
+  if(g.title.show){
+    s += '<rect x="6" y="' + top + '" width="' + (W-12) + '" height="11" fill="' + (g.title.style === 'red' ? RED : g.title.style === 'black' ? '#111' : '#e9ebee') + '"/>';
+    top += 13;
+  }
+  const timeW = g.showTime ? 9 : 0;
+  const hh = g.showHeader ? 8 : 0;
+  const gx = 6 + timeW, gy = top + hh, gw = W - 12 - timeW, gh = H - 6 - gy;
+  if(g.showHeader) s += '<rect x="6" y="' + top + '" width="' + (W-12) + '" height="' + hh + '" fill="#111"/>';
+  s += '<rect x="6" y="' + top + '" width="' + timeW + '" height="' + (hh + gh) + '" fill="#111"/>';
+  if(sec && sec.on){
+    const bc = (sec.style === 'black') ? '#111' : (sec.style === 'plain' ? '#f0bcc4' : RED);
+    const bh = 4;
+    s += '<rect x="6" y="' + gy + '" width="' + (gw + timeW) + '" height="' + bh + '" fill="' + bc + '"/>';
+    const y2 = gy + bh + (gh - bh*2) * (sec.split / Math.max(1, g.rows));
+    s += '<rect x="6" y="' + y2 + '" width="' + (gw + timeW) + '" height="' + bh + '" fill="' + bc + '"/>';
+  }
+  s += '<rect x="' + gx + '" y="' + gy + '" width="' + gw + '" height="' + gh + '" fill="none" stroke="#111" stroke-width="' + Math.max(0.8, g.lineW) + '"/>';
+  for(let c=1;c<g.cols;c++){
+    const x = gx + gw/colsDiv(g.cols)*c;
+    s += '<line x1="' + x + '" y1="' + gy + '" x2="' + x + '" y2="' + (gy+gh) + '" stroke="#111" stroke-width="0.6" opacity=".5"/>';
+  }
+  for(let r=1;r<g.rows;r++){
+    const y = gy + gh/colsDiv(g.rows)*r;
+    s += '<line x1="' + gx + '" y1="' + y + '" x2="' + (gx+gw) + '" y2="' + y + '" stroke="#111" stroke-width="0.6" opacity=".5"/>';
+  }
+  return s + '</svg>';
+}
+
+function colsDiv(n){ return Math.max(1, n); }
+
+/* 左栏事件 */
+$('#modeSeg').addEventListener('click', function(e){
+  const b = e.target.closest('button');
+  if(!b) return;
+  state.colorMode = b.getAttribute('data-mode');
+  commit();
+  syncLeft();
+  renderProps(true);
+  draw();
+});
+
+$('#quantChk').addEventListener('change', function(e){
+  state.quantize = e.target.checked; commit();
+});
+
+$('#titleChk').addEventListener('change', function(e){
+  state.grid.title.show = e.target.checked; commit(); syncLeft(); draw();
+});
+
+$('#titleInput').addEventListener('input', function(e){
+  state.grid.title.text = e.target.value;
+  $('#docChip').textContent = e.target.value || '课程表';
+  draw(); scheduleCommit();
+});
+
+$('#titleStyleSel').addEventListener('change', function(e){
+  state.grid.title.style = e.target.value; commit(); draw();
+});
+
+$('#ruleChk').addEventListener('change', function(e){
+  state.grid.title.rule = e.target.checked; commit(); draw();
+});
+
+function setNumber(id, path, min, max, after){
+  $(id).addEventListener('input', function(e){
+    let v = parseInt(e.target.value, 10);
+    if(isNaN(v)) return;
+    v = clamp(v, min, max);
+    path(v);
+    draw(); updateMeta(); scheduleCommit();
+    if(after) after();
+  });
+}
+
+setNumber('#rowsInput', function(v){ state.grid.rows = v; }, 1, 14, function(){ syncLeft(); });
+setNumber('#colsInput', function(v){ state.grid.cols = v; }, 1, 7, function(){ syncLeft(); });
+setNumber('#padInput', function(v){ state.grid.pad = v; }, 0, 18);
+
+$('#headerChk').addEventListener('change', function(e){ state.grid.showHeader = e.target.checked; commit(); draw(); syncLeft(); });
+$('#timeChk').addEventListener('change', function(e){ state.grid.showTime = e.target.checked; commit(); draw(); syncLeft(); });
+$('#timesChk').addEventListener('change', function(e){
+  state.grid.showTimes = e.target.checked;
+  if(state.grid.showTimes) state.grid.timeW = Math.max(state.grid.timeW || 0, 42);
+  commit(); syncLeft(); draw();
+});
+$('#gridChk').addEventListener('change', function(e){ state.grid.showGrid = e.target.checked; commit(); draw(); syncLeft(); });
+$('#lineSel').addEventListener('change', function(e){ state.grid.lineW = Number(e.target.value); commit(); draw(); });
+$('#snapChk').addEventListener('change', function(e){ state.snap = e.target.checked; commit(); });
+
+$('#secChk').addEventListener('change', function(e){
+  state.grid.sections.on = e.target.checked; commit(); syncLeft(); draw();
+});
+$('#secAm').addEventListener('input', function(e){
+  state.grid.sections.morning = e.target.value; draw(); scheduleCommit();
+});
+$('#secPm').addEventListener('input', function(e){
+  state.grid.sections.afternoon = e.target.value; draw(); scheduleCommit();
+});
+$('#secSplit').addEventListener('input', function(e){
+  let v = parseInt(e.target.value, 10);
+  if(isNaN(v)) return;
+  state.grid.sections.split = clamp(v, 1, Math.max(1, state.grid.rows - 1));
+  draw(); syncLeft(); scheduleCommit();
+});
+$('#secStyle').addEventListener('change', function(e){
+  state.grid.sections.style = e.target.value; commit(); draw();
+});
+$('#textureChk').addEventListener('change', function(e){
+  state.grid.texture = e.target.checked ? 'dots' : 'none'; commit(); draw();
+});
+
+$('#daysTa').addEventListener('input', function(e){
+  state.grid.days = e.target.value.split('\n'); draw(); scheduleCommit();
+});
+$('#timesTa').addEventListener('input', function(e){
+  state.grid.times = e.target.value.split('\n'); draw(); scheduleCommit();
+});
+
+tplGrid.addEventListener('click', function(e){
+  const b = e.target.closest('.tpl');
+  if(!b) return;
+  applyTemplate(b.getAttribute('data-tpl'));
+});
+
+function applyTemplate(key){
+  const t = TEMPLATES[key];
+  if(!t) return;
+  pushHistory();  // 方便撤销
+  state.grid = clone(t.grid);
+  state.grid.title = clone(t.grid.title);
+  state.grid.sections = clone(t.sections || {on:false, morning:'上午', afternoon:'下午', split:3, style:'red'});
+  state.grid.texture = t.texture || 'none';
+  if(t.colorMode) state.colorMode = t.colorMode;
+  state.selTpl = key;
+  state.cells = {};
+  state.elements = [];
+  selId = null;
+  propsFor = null;
+  commit();
+  syncLeft();
+  renderProps(true);
+  renderLayers();
+  draw();
+  toast('已应用模版：' + t.name);
+}
+
+$('#demoBtn').addEventListener('click', function(){
+  state.cells = demoCells();
+  commit(); draw();
+  toast('已填入示例课程');
+});
+
+$('#clearBtn').addEventListener('click', function(){
+  state.cells = {};
+  commit(); draw();
+  toast('课程内容已清空');
+});
+
+/* ==================================================================
+   10. 历史 / 持久化
+   ================================================================== */
+let history = [];
+let hidx = -1;
+let commitTimer = null;
+
+function snap(){ return JSON.stringify(state); }
+
+function persist(){
+  try{ localStorage.setItem(STORE_KEY, snap()); }catch(e){}
+}
+
+function pushHistory(){
+  const s = snap();
+  if(history[hidx] === s) return;
+  history = history.slice(0, hidx+1);
+  history.push(s);
+  if(history.length > 80) history.shift();
+  hidx = history.length - 1;
+  updateUndoBtns();
+}
+
+function commit(){
+  pushHistory();
+  persist();
+  draw();
+  updateUndoBtns();
+}
+
+function scheduleCommit(){
+  clearTimeout(commitTimer);
+  commitTimer = setTimeout(function(){
+    pushHistory();
+    persist();
+    updateUndoBtns();
+  }, 450);
+}
+
+function updateUndoBtns(){
+  $('#undoBtn').disabled = hidx <= 0;
+  $('#redoBtn').disabled = hidx >= history.length - 1;
+}
+
+function undo(){
+  if(hidx <= 0) return;
+  hidx--;
+  state = normalize(JSON.parse(history[hidx]));
+  selId = null; propsFor = null;
+  persist(); draw(); syncLeft(); renderProps(true); renderLayers(); updateUndoBtns();
+}
+
+function redo(){
+  if(hidx >= history.length - 1) return;
+  hidx++;
+  state = normalize(JSON.parse(history[hidx]));
+  selId = null; propsFor = null;
+  persist(); draw(); syncLeft(); renderProps(true); renderLayers(); updateUndoBtns();
+}
+
+$('#undoBtn').addEventListener('click', undo);
+$('#redoBtn').addEventListener('click', redo);
+
+$('#saveBtn').addEventListener('click', function(){
+  persist();
+  toast('已保存到本机浏览器');
+});
+
+/* ==================================================================
+   11. 导入 / 导出
+   ================================================================== */
+function quantize(data){
+  const bwr = state.colorMode === 'bwr';
+  for(let i=0;i<data.length;i+=4){
+    const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+    let R = 255, G = 255, B = 255;
+    if(a >= 128){
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const sat = mx ? (mx - mn) / mx : 0;
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      const reddish = sat > 0.28 && (r - Math.max(g, b)) > 20 && lum < 172;
+      if(bwr && reddish){ R = 200; G = 16; B = 46; }
+      else if(lum < 140){ R = 0; G = 0; B = 0; }
+    }
+    data[i] = R; data[i+1] = G; data[i+2] = B; data[i+3] = 255;
+  }
+}
+
+function exportPNG(){
+  exporting = true;
+  draw();
+  const out = document.createElement('canvas');
+  out.width = state.width; out.height = state.height;
+  const octx = out.getContext('2d');
+  octx.drawImage(cv, 0, 0);
+  if(state.quantize){
+    const img = octx.getImageData(0, 0, out.width, out.height);
+    quantize(img.data);
+    octx.putImageData(img, 0, 0);
+  }
+  exporting = false;
+  draw();
+  out.toBlob(function(blob){
+    if(!blob) return toast('导出失败');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const t = (state.grid.title.text || '课程表').replace(/[\\/:*?"<>|\s]/g, '');
+    a.href = url;
+    a.download = (t || '课程表') + '_400x300_' + (state.colorMode === 'bwr' ? '红黑白' : '黑白') + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+    toast('已导出 400 × 300 PNG');
+  }, 'image/png');
+}
+
+$('#exportBtn').addEventListener('click', exportPNG);
+
+$('#importBtn').addEventListener('click', function(){ $('#fileInput').click(); });
+
+$('#fileInput').addEventListener('change', function(e){
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    try{
+      state = normalize(JSON.parse(String(reader.result)));
+      selId = null; propsFor = null;
+      history = []; hidx = -1;
+      commit(); syncLeft(); renderProps(true); renderLayers(); draw();
+      toast('已导入配置');
+    }catch(err){
+      toast('JSON 解析失败');
+    }
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+});
+
+
+/* ==================================================================
+   11.5 数据编辑弹层
+   ================================================================== */
+const dataModal = $('#dataModal');
+const dataTableEl = $('#dataTable');
+let dataDraft = null;
+
+function openDataModal(){
+  const g = state.grid;
+  dataDraft = {
+    title: g.title.text || '',
+    rows: g.rows,
+    cols: g.cols,
+    days: g.days.slice(0, g.cols),
+    times: g.times.slice(0, g.rows),
+    cells: clone(state.cells),
+    sections: clone(g.sections)
+  };
+  while(dataDraft.days.length < g.cols) dataDraft.days.push(DAY_NAMES[dataDraft.days.length] || '');
+  while(dataDraft.times.length < g.rows) dataDraft.times.push('');
+  dataDraft.sections.split = clamp(Math.round(dataDraft.sections.split || 1), 1, Math.max(1, g.rows - 1));
+  $('#dataTitleInput').value = dataDraft.title;
+  $('#dataRows').value = dataDraft.rows;
+  $('#dataCols').value = dataDraft.cols;
+  renderDataTable();
+  dataModal.hidden = false;
+}
+
+function closeDataModal(){
+  dataModal.hidden = true;
+  dataDraft = null;
+}
+
+function renderDataTable(){
+  const g = state.grid, d = dataDraft;
+  if(!d) return;
+  const rows = d.rows, cols = d.cols;
+  let h = '<table class="dt"><thead><tr><th class="corner">节次</th>';
+  for(let c=0;c<cols;c++){
+    h += '<th><input data-day="' + c + '" value="' + esc(d.days[c] || '') + '" placeholder="' + esc(DAY_NAMES[c] || '') + '"></th>';
+  }
+  h += '</tr></thead><tbody>';
+  for(let r=0;r<rows;r++){
+    if(d.sections && d.sections.on && (r === 0 || r === d.sections.split)){
+      const key = (r === 0) ? 'morning' : 'afternoon';
+      h += '<tr class="sec"><td colspan="' + (cols + 1) + '">' +
+           '<input data-sec="' + key + '" value="' + esc(d.sections[key] || '') + '" placeholder="' + (key === 'morning' ? '上午' : '下午') + '"></td></tr>';
+    }
+    h += '<tr><th><input data-time="' + r + '" value="' + esc(d.times[r] || '') + '" placeholder="' + (r + 1) + '"></th>';
+    for(let c=0;c<cols;c++){
+      const key = r + '_' + c;
+      const cell = d.cells[key] || {t:'', c:'black'};
+      h += '<td class="dc"><input data-cell="' + key + '" value="' + esc(cell.t || '') + '">' +
+           '<button type="button" class="cchip' + (cell.c === 'red' ? ' red' : '') + '" data-chip="' + key + '" title="切换颜色"></button></td>';
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  dataTableEl.innerHTML = h;
+  $('#dataCount').textContent = rows + ' 节 × ' + cols + ' 天 · ' + Object.keys(d.cells).length + ' 条课程';
+}
+
+function applyDataDraft(){
+  if(!dataDraft) return;
+  const g = state.grid, d = dataDraft;
+  const cells = {};
+  Object.keys(d.cells).forEach(function(k){
+    const cell = d.cells[k];
+    const t = (cell && cell.t) ? String(cell.t).trim() : '';
+    const rc = k.split('_');
+    if(+rc[0] >= d.rows || +rc[1] >= d.cols) return;
+    if(t) cells[k] = {t:t, c:(cell.c === 'red' ? 'red' : 'black')};
+  });
+  pushHistory();
+  g.rows = d.rows;
+  g.cols = d.cols;
+  g.days = d.days.slice(0, d.cols);
+  g.times = d.times.slice(0, d.rows);
+  while(g.times.length < g.rows) g.times.push('');
+  while(g.days.length < g.cols) g.days.push(DAY_NAMES[g.days.length] || '');
+  g.sections = clone(d.sections);
+  g.title.text = d.title;
+  state.cells = cells;
+  state.selTpl = '';
+  closeDataModal();
+  commit(); syncLeft(); draw();
+  toast('课程数据已更新');
+}
+
+$('#dataTitleInput').addEventListener('input', function(e){
+  if(dataDraft) dataDraft.title = e.target.value;
+});
+
+function changeDraftSize(which, val){
+  if(!dataDraft) return;
+  const v = clamp(parseInt(val, 10) || 1, 1, which === 'rows' ? 14 : 7);
+  dataDraft[which] = v;
+  if(which === 'rows' && dataDraft.sections.on){
+    dataDraft.sections.split = clamp(dataDraft.sections.split, 1, Math.max(1, v - 1));
+  }
+  if(which === 'rows'){
+    $('#dataRows').value = v;
+    while(dataDraft.times.length < v) dataDraft.times.push('');
+  }else{
+    $('#dataCols').value = v;
+    while(dataDraft.days.length < v) dataDraft.days.push(DAY_NAMES[dataDraft.days.length] || '');
+  }
+  renderDataTable();
+}
+$('#dataRows').addEventListener('change', function(e){ changeDraftSize('rows', e.target.value); });
+$('#dataCols').addEventListener('change', function(e){ changeDraftSize('cols', e.target.value); });
+
+dataTableEl.addEventListener('input', function(e){
+  const t = e.target;
+  if(!dataDraft) return;
+  if(t.hasAttribute('data-day')) dataDraft.days[+t.getAttribute('data-day')] = t.value;
+  else if(t.hasAttribute('data-time')) dataDraft.times[+t.getAttribute('data-time')] = t.value;
+  else if(t.hasAttribute('data-sec')) dataDraft.sections[t.getAttribute('data-sec')] = t.value;
+  else if(t.hasAttribute('data-cell')){
+    const key = t.getAttribute('data-cell');
+    const cur = dataDraft.cells[key] || {c:'black'};
+    if(t.value.trim()) dataDraft.cells[key] = {t:t.value, c:cur.c || 'black'};
+    else delete dataDraft.cells[key];
+  }
+});
+
+dataTableEl.addEventListener('click', function(e){
+  const chip = e.target.closest('.cchip');
+  if(!chip || !dataDraft) return;
+  const key = chip.getAttribute('data-chip');
+  const cell = dataDraft.cells[key] || {t:'', c:'black'};
+  cell.c = (cell.c === 'red') ? 'black' : 'red';
+  dataDraft.cells[key] = cell;
+  chip.classList.toggle('red', cell.c === 'red');
+});
+
+/* 从 Excel 粘贴：按 Tab / 换行拆分，从当前单元格铺开 */
+dataTableEl.addEventListener('paste', function(e){
+  if(!dataDraft) return;
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
+  if(text.indexOf('\t') < 0 && text.indexOf('\n') < 0) return;
+  const target = e.target.closest('input[data-cell]');
+  let r0 = 0, c0 = 0;
+  if(target){
+    const k = target.getAttribute('data-cell').split('_');
+    r0 = +k[0]; c0 = +k[1];
+  }
+  e.preventDefault();
+  const lines = text.replace(/\r/g, '').split('\n');
+  while(lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+  lines.forEach(function(line, r){
+    line.split('\t').forEach(function(val, c){
+      const rr = r0 + r, cc = c0 + c;
+      if(rr >= dataDraft.rows || cc >= dataDraft.cols) return;
+      const key = rr + '_' + cc;
+      const cur = dataDraft.cells[key] || {c:'black'};
+      const v = val.trim();
+      if(v) dataDraft.cells[key] = {t:v, c:cur.c || 'black'};
+      else delete dataDraft.cells[key];
+    });
+  });
+  renderDataTable();
+  toast('已粘贴 ' + lines.length + ' 行数据');
+});
+
+$('#dataBtn').addEventListener('click', openDataModal);
+$('#dataBtn2').addEventListener('click', openDataModal);
+$('#dataApply').addEventListener('click', applyDataDraft);
+$('#dataCancel').addEventListener('click', closeDataModal);
+dataModal.addEventListener('mousedown', function(e){
+  if(e.target === dataModal) closeDataModal();
+});
+
+/* ==================================================================
+   12. 缩放 / 键盘
+   ================================================================== */
+function applyZoom(){
+  cv.style.width = (state.width * zoom) + 'px';
+  cv.style.height = (state.height * zoom) + 'px';
+  canvasBox.style.width = (state.width * zoom) + 'px';
+  canvasBox.style.height = (state.height * zoom) + 'px';
+  updateMeta();
+}
+
+$('#zoomIn').addEventListener('click', function(){
+  zoom = zoom >= 2 ? 2 : Math.round((zoom + 0.5) * 10) / 10;
+  applyZoom();
+});
+$('#fitBtn').addEventListener('click', function(){
+  zoom = 1; applyZoom();
+});
+$('#zoomOut').addEventListener('click', function(){
+  zoom = zoom <= 1 ? 1 : Math.round((zoom - 0.5) * 10) / 10;
+  applyZoom();
+});
+
+document.addEventListener('keydown', function(e){
+  const tag = (e.target.tagName || '').toLowerCase();
+  const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z'){
+    e.preventDefault();
+    if(e.shiftKey) redo(); else undo();
+    return;
+  }
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'){
+    e.preventDefault(); persist(); toast('已保存'); return;
+  }
+  if(e.key === 'Escape' && !dataModal.hidden){ closeDataModal(); return; }
+  if(typing) return;
+
+  const el = getSel();
+  if(e.key === 'Escape'){ selectEl(null); closeCellEditor(); return; }
+  if(!el) return;
+
+  if(e.key === 'Delete' || e.key === 'Backspace'){
+    e.preventDefault(); deleteSelected(); return;
+  }
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd'){
+    e.preventDefault();
+    const copy = clone(el);
+    copy.x = Math.min(state.width - 4, el.x + 8);
+    copy.y = Math.min(state.height - 4, el.y + 8);
+    addElement(copy);
+    return;
+  }
+  const step = e.shiftKey ? 5 : 1;
+  let moved = true;
+  if(e.key === 'ArrowLeft') el.x -= step;
+  else if(e.key === 'ArrowRight') el.x += step;
+  else if(e.key === 'ArrowUp') el.y -= step;
+  else if(e.key === 'ArrowDown') el.y += step;
+  else moved = false;
+  if(moved){ e.preventDefault(); draw(); renderProps(true); scheduleCommit(); }
+});
+
+/* ==================================================================
+   13. 启动
+   ================================================================== */
+function boot(){
+  renderPalette();
+  renderTemplates();
+  applyZoom();
+  history = [snap()];
+  hidx = 0;
+  syncLeft();
+  renderProps(true);
+  renderLayers();
+  draw();
+  updateUndoBtns();
+  if(!loadState()) toast('欢迎，双击单元格即可开始填写课程');
+}
+
+boot();
+
+window.__designer = {state:function(){ return state; }, layout:function(){ return layout(); }};
+})();
+</script>
+</body>
+</html>
