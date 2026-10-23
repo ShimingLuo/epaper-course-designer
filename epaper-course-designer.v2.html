@@ -449,17 +449,21 @@
           <div class="ble-row">
             <button class="btn primary" id="bleConnect">连接蓝牙</button>
             <button class="btn" id="bleCalib">设置驱动</button>
-            <button class="btn" id="bleSend" disabled>发送到屏幕</button>
+            <button class="btn" id="bleSend" disabled>发送预览</button>
           </div>
           <div class="ble-detect" id="bleDetect">尚未连接设备，点击「连接蓝牙」配对。</div>
           <div class="ble-fields">
             <label class="field"><span>MTU（包长，默认 20）</span><input class="input" id="bleMtu" type="number" value="20" min="7" max="247"></label>
             <label class="field"><span>确认间隔（默认 50）</span><input class="input" id="bleAck" type="number" value="50" min="0" max="500"></label>
+            <label class="field"><span>图片槽位（从 1 开始）</span><input class="input" id="bleSlot" type="number" value="1" min="1" max="128"></label>
+          </div>
+          <div class="ble-row">
+            <button class="btn primary" id="bleSendSlot" disabled>发送保存</button>
           </div>
           <label class="check"><input type="checkbox" id="bleRle" disabled> RLE 压缩（固件上报 rle=1 时自动启用）</label>
           <div class="ble-note" id="bleRes"></div>
         </div>
-        <div class="ble-meta" id="bleMeta">将直接读取当前画布发送。<br>画布是否按三色渲染由左侧「页面」的「按墨水屏三色显示」决定，推上去的就是你正在看的这张图。</div>
+        <div class="ble-meta" id="bleMeta">「发送预览」只临时显示；「发送保存」会把图片写入所选槽位并显示。槽位从 1 开始编号。</div>
       </div>
       <div class="ble-logwrap">
         <div class="ble-log" id="bleLog"></div>
@@ -3113,11 +3117,11 @@ function applyExportMode(){
   const png = exportMode === 'png';
   const cfg = exportMode === 'cfg';
   const isBle = exportMode === 'ble';
-  $('#exportTitle').textContent = png ? '导出成果图' : cfg ? '导出数据配置' : '推送到蓝牙墨水屏设备';
+  $('#exportTitle').textContent = png ? '导出成果图' : cfg ? '导出数据配置' : '发送图片到蓝牙墨水屏设备';
   $('#exportDesc').textContent = png
     ? '这是即将保存的 PNG 实际效果，已按当前设置处理完毕。确认无误后再下载。'
     : cfg ? '给这份配置起个名字。导出为紧凑型 JSON 字串（单行、无缩进空格），之后用「导入」即可原样还原。'
-    : '通过浏览器蓝牙把当前课程表发送到墨水屏。先点「连接蓝牙」配对设备（自动检测型号），再点「发送到屏幕」即可传图。';
+    : '通过浏览器蓝牙把当前课程表发送到墨水屏。「发送预览」只临时显示；「发送保存」会写入所选槽位。传输和刷新完成前请保持连接。';
   $('#exportPanePng').hidden = !png;
   $('#exportPaneCfg').hidden = !cfg;
   $('#exportPaneBle').hidden = !isBle;
@@ -3157,7 +3161,9 @@ function renderExportPngPane(){
 }
 
 function closeExportModal(){
-  if(ble.connected) bleDisconnect();
+  /* 与官方 EPD-nRF5 页面保持一致：关闭弹窗不主动断开。
+     三色屏 REFRESH 可能持续十几秒；此时触发 disconnect 会让固件立刻 sleep，
+     可能打断屏幕刷新。连接仍可用「断开」按钮显式关闭。 */
   exportModal.hidden = true;
   exportURL = '';
 }
@@ -3456,6 +3462,8 @@ const EpdCmd = {
   SET_PINS:0x00, INIT:0x01, CLEAR:0x02, SEND_CMD:0x03, SEND_DATA:0x04, REFRESH:0x05, SLEEP:0x06,
   SET_TIME:0x20,
   WRITE_IMG:0x30,                      // v1.6
+  FLASH_DATA:0x41, FLASH_END:0x42,
+  IMG_BEGIN:0x4E, IMG_SHOW:0x4F, IMG_DELETE:0x50, IMG_INFO:0x51, IMG_READ:0x52, IMG_CAROUSEL:0x53,
   SET_CONFIG:0x90, SYS_RESET:0x91, SYS_SLEEP:0x92, CFG_ERASE:0x99
 };
 const EPD_SERVICE = '62750001-d828-918d-fb46-b6c11c675aec';
@@ -3534,7 +3542,7 @@ function convertUC8159(bw, red, W, H){
   return out;
 }
 
-const ble = { device:null, server:null, char:null, connected:false, rle:false, pins:null, lastErr:null, msgIndex:0, version:0, config:null, configWaiter:null };
+const ble = { device:null, server:null, char:null, connected:false, rle:false, pins:null, lastErr:null, msgIndex:0, version:0, config:null, configWaiter:null, notifyWaiter:null };
 
 function bleLog(msg, cls){
   const el = $('#bleLog'); if(!el) return;
@@ -3604,6 +3612,9 @@ function bleHandleNotify(value){
   }
   const msg=new TextDecoder().decode(data);
   bleLog(msg,'dn');
+  if(ble.notifyWaiter && ble.notifyWaiter.match(msg)){
+    const waiter=ble.notifyWaiter; ble.notifyWaiter=null; clearTimeout(waiter.timer); waiter.resolve(msg);
+  }
   if(msg.startsWith('mtu=') && msg.length>4){
     // 官方：直接采用设备上报的 MTU 作为每包长度基准（chunk = mtu - 2）
     const mtu=parseInt(msg.substring(4))||20;
@@ -3615,9 +3626,11 @@ function bleHandleNotify(value){
 }
 
 function onBleDisconnected(){
+  if(ble.notifyWaiter){ clearTimeout(ble.notifyWaiter.timer); ble.notifyWaiter.reject(new Error('蓝牙已断开')); ble.notifyWaiter=null; }
   ble.connected=false; ble.server=null; ble.char=null; ble.config=null; ble.configWaiter=null; ble.rle=false; ble.pins=null;
   const c=$('#bleConnect'); if(c) c.textContent='连接蓝牙';
   const s=$('#bleSend'); if(s) s.disabled=true;
+  const ss=$('#bleSendSlot'); if(ss) ss.disabled=true;
   const cb=$('#bleRle'); if(cb){ cb.checked=false; }
   bleLog('已断开连接');
   bleSetDetect('warn','已断开。');
@@ -3664,6 +3677,7 @@ async function onBleConnect(){
     ble.connected=true;
     const c=$('#bleConnect'); if(c) c.textContent='断开';
     const s=$('#bleSend'); if(s) s.disabled=false;
+    const ss=$('#bleSendSlot'); if(ss) ss.disabled=false;
     bleSetStatus('已连接，正在读取设备配置…');
     const cfg=await bleWaitConfig(1500);
     if(!cfg){
@@ -3792,6 +3806,79 @@ async function bleWriteImage(data, step='bw'){
   return writeFail===0;
 }
 
+function bleWaitNotify(match, timeout=180000){
+  if(ble.notifyWaiter){ clearTimeout(ble.notifyWaiter.timer); ble.notifyWaiter.reject(new Error('新的设备操作已开始')); }
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{ if(ble.notifyWaiter){ ble.notifyWaiter=null; reject(new Error('等待设备响应超时')); } },timeout);
+    ble.notifyWaiter={match,resolve,reject,timer};
+  });
+}
+function bleCrc32(data){
+  let crc=0xffffffff;
+  for(const byte of data){ crc^=byte; for(let i=0;i<8;i++) crc=(crc>>>1)^((crc&1)?0xedb88320:0); }
+  return (crc^0xffffffff)>>>0;
+}
+function bleLe32(v){ return [v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255]; }
+function bleBuildSlotBlob(payload, width, height, planes){
+  const needed=Math.ceil(width/8)*height*planes;
+  if(payload.length!==needed) throw new Error(`槽位图像长度 ${payload.length} B 与 ${width}×${height} / ${planes} 平面不符（应为 ${needed} B）`);
+  const stride=Math.ceil((16+payload.length)/4096)*4096;
+  const blob=new Uint8Array(stride); blob.fill(0xff);
+  blob.set([0x49,0x4d,0x41,0x51],0);
+  blob.set(bleLe32(bleCrc32(payload)),4);
+  blob[8]=width&255; blob[9]=(width>>>8)&255;
+  blob[10]=height&255; blob[11]=(height>>>8)&255; blob[12]=planes;
+  blob.set(payload,16);
+  return blob;
+}
+function bleSlotIndex(){ return Math.max(0,Math.min(127,(parseInt($('#bleSlot').value,10)||1)-1)); }
+function bleCurrentSlotPayload(){
+  const drv=bleResolveDriver(), off0=renderExportCanvas(); let off=off0;
+  if(off0.width!==drv.w || off0.height!==drv.h){
+    off=document.createElement('canvas'); off.width=drv.w; off.height=drv.h;
+    const ctx=off.getContext('2d'); ctx.imageSmoothingEnabled=state.quantize?false:(off0.width>drv.w); ctx.drawImage(off0,0,0,drv.w,drv.h);
+  }
+  const bm=courseToBitmaps(off), three=state.colorMode==='bwr';
+  const payload=new Uint8Array(bm.bw.length*(three?2:1)); payload.set(bm.bw,0); if(three) payload.set(bm.red,bm.bw.length);
+  return {blob:bleBuildSlotBlob(payload,bm.W,bm.H,three?2:1),w:bm.W,h:bm.H,planes:three?2:1};
+}
+async function bleShowSlot(slot=bleSlotIndex()){
+  const response=bleWaitNotify(msg=>['img=ok','img=empty','img=err','img=busy'].includes(msg),120000);
+  if(!await bleWrite(EpdCmd.IMG_SHOW,new Uint8Array([slot]),true)) throw new Error('槽位显示指令发送失败');
+  const msg=await response;
+  if(msg!=='img=ok') throw new Error('设备未能显示槽位：'+msg);
+  return msg;
+}
+async function bleSendToSlot(){
+  if(!ble.connected || !ble.char){ bleLog('未连接蓝牙','err'); return; }
+  const btn=$('#bleSendSlot'), screen=$('#bleSend');
+  if(btn) btn.disabled=true; if(screen) screen.disabled=true;
+  try{
+    const slot=bleSlotIndex(), built=bleCurrentSlotPayload(), blob=built.blob, crc=bleCrc32(blob);
+    bleSetStatus(`正在写入槽位 ${slot+1}，请勿断开蓝牙…`);
+    bleLog(`槽位 ${slot+1}: ${built.w}×${built.h}，${built.planes} 平面，闪存块 ${blob.length} B`,'up');
+    const begin=Uint8Array.from([slot,...bleLe32(blob.length),...bleLe32(crc),1]);
+    const ready=bleWaitNotify(msg=>msg==='flash=ready'||msg.startsWith('flash=err')||msg.startsWith('img=bad'),180000);
+    if(!await bleWrite(EpdCmd.IMG_BEGIN,begin,true)) throw new Error('IMG_BEGIN 发送失败');
+    const beginMsg=await ready; if(beginMsg!=='flash=ready') throw new Error(beginMsg);
+    const mtu=Math.max(20,(+$('#bleMtu').value||20)), chunk=Math.max(8,Math.min(192,mtu-6));
+    for(let off=0;off<blob.length;off+=chunk){
+      const part=blob.subarray(off,Math.min(blob.length,off+chunk));
+      const packet=new Uint8Array(5+part.length); packet.set(bleLe32(off),0); packet[4]=0; packet.set(part,5);
+      if(!await bleWrite(EpdCmd.FLASH_DATA,packet,true)) throw new Error(`FLASH_DATA 在 ${off} B 处失败`);
+      if(off===0 || off+part.length===blob.length || off%(chunk*25)===0) bleSetStatus(`正在写入槽位 ${slot+1}：${Math.min(100,Math.round((off+part.length)*100/blob.length))}%`);
+    }
+    const ended=bleWaitNotify(msg=>msg==='flash=ok'||msg.startsWith('flash=bad')||msg.startsWith('flash=err'),180000);
+    if(!await bleWrite(EpdCmd.FLASH_END,null,true)) throw new Error('FLASH_END 发送失败');
+    const endMsg=await ended; if(endMsg!=='flash=ok') throw new Error(endMsg);
+    bleLog(`槽位 ${slot+1} 已通过 CRC 校验并保存到闪存`,'up');
+    bleSetStatus(`槽位 ${slot+1} 已保存，正在刷新显示…`);
+    await bleShowSlot(slot);
+    bleSetStatus(`槽位 ${slot+1} 已保存并显示。之后可直接切换，无需重传。`);
+  }catch(e){ bleLog('槽位写入失败: '+(e.message||e),'err'); bleSetStatus('槽位写入失败：'+(e.message||e)); }
+  finally{ if(btn) btn.disabled=false; if(screen) screen.disabled=false; }
+}
+
 async function bleSend(){
   if(!ble.connected || !ble.char){ bleLog('未连接蓝牙','err'); return; }
   const btn=$('#bleSend'); if(btn) btn.disabled=true;
@@ -3830,25 +3917,30 @@ async function bleSend(){
     bleLog(`准备发送 ${W}×${H} ${three?'三色（黑白+红白）':'黑白'}，MTU ${mtuEff}，共 ${raw} B`,'up');
 
     // 3) 传输：UC8159 系列（08/09/0e/0f）走 4bpp 合成单路，其余黑白+红白两平面
+    let transferOk=true;
     if(three && UC8159_IDS.includes(drv.v)){
       bleLog('UC8159：两平面合成为 4bpp 单路发送','rd');
-      await bleWriteImage(convertUC8159(bm.bw,bm.red,W,H), 'bw');
+      transferOk=await bleWriteImage(convertUC8159(bm.bw,bm.red,W,H), 'bw');
     }else if(three){
-      await bleWriteImage(bm.bw,'bw');
-      await bleWriteImage(bm.red,'red');
+      transferOk=await bleWriteImage(bm.bw,'bw');
+      if(transferOk) transferOk=await bleWriteImage(bm.red,'red');
     }else{
       if(UC8159_IDS.includes(drv.v)){
         const empty=new Uint8Array(bm.bw.length).fill(0xFF);
-        await bleWriteImage(convertUC8159(bm.bw,empty,W,H),'bw');
+        transferOk=await bleWriteImage(convertUC8159(bm.bw,empty,W,H),'bw');
       }else{
-        await bleWriteImage(bm.bw,'bw');
+        transferOk=await bleWriteImage(bm.bw,'bw');
       }
+    }
+    if(!transferOk){
+      throw new Error('图片数据传输不完整，已停止刷新；请降低「确认间隔」后重试');
     }
     // 4) 刷新
     bleSetStatus('刷新中，三色全刷约 12–20 秒，请勿操作…');
-    await bleWrite(EpdCmd.REFRESH);
+    if(!await bleWrite(EpdCmd.REFRESH)) throw new Error('刷新指令发送失败，请保持连接后重试');
     bleLog('刷新指令已发送','up');
-    bleSetStatus('已完成。三色屏全刷较慢，等红灯熄灭即完成。');
+    bleLog('已发送到屏幕（不存储）；刷新完成前请保持蓝牙连接','dn');
+    bleSetStatus('预览已发送。需要断电保留或参与轮播，请使用「发送保存」。');
   }catch(e){
     bleLog('发送失败: '+(e.message||e),'err');
     bleSetStatus('发送失败：'+(e.message||e));
@@ -3873,7 +3965,7 @@ async function bleCalibrate(){
 
 function bleOnOpen(){
   if(ble.connected){
-    bleSetDetect('ok','已连接设备，点「发送到屏幕」即可传图。');
+    bleSetDetect('ok','已连接设备：临时显示用「发送预览」，写入槽位用「发送保存」。');
   }else{
     bleSetDetect('','尚未连接设备，点击「连接蓝牙」配对。');
   }
@@ -3883,6 +3975,8 @@ const bleConnectBtn=$('#bleConnect');
 if(bleConnectBtn) bleConnectBtn.addEventListener('click', onBleConnect);
 const bleSendBtn=$('#bleSend');
 if(bleSendBtn) bleSendBtn.addEventListener('click', bleSend);
+const bleSendSlotBtn=$('#bleSendSlot');
+if(bleSendSlotBtn) bleSendSlotBtn.addEventListener('click', bleSendToSlot);
 const bleCalibBtn=$('#bleCalib');
 if(bleCalibBtn) bleCalibBtn.addEventListener('click', bleCalibrate);
 bleInitDriverSelect();
